@@ -121,7 +121,7 @@ function showDepositRequest(amountXof) {
   const form = $('#deposit-request-form');
   if (!$('#deposit-request-amount')) form.insertAdjacentHTML('afterbegin', `<label>Montant de la demande<input id="deposit-request-amount" value="${formatMoney(amountXof)}" readonly></label>`);
   if (!$('#deposit-screenshot')) form.insertAdjacentHTML('beforeend', '<label>Capture d’écran du paiement<input id="deposit-screenshot" type="file" accept="image/png,image/jpeg,image/webp" required><small class="file-help">Ajoutez la capture visible dans votre application Wave.</small><img id="deposit-screenshot-preview" class="deposit-screenshot-preview hidden" alt="Aperçu de la capture de paiement"></label>');
-  $('#deposit-screenshot').onchange = () => { const file = $('#deposit-screenshot').files?.[0]; const preview = $('#deposit-screenshot-preview'); if (!file) return preview.classList.add('hidden'); preview.src = URL.createObjectURL(file); preview.classList.remove('hidden'); };
+  $('#deposit-screenshot').onchange = () => { const file = $('#deposit-screenshot').files?.[0]; const preview = $('#deposit-screenshot-preview'); if (!file) return preview.classList.add('hidden'); const reader = new FileReader(); reader.onload = () => { preview.src = reader.result; preview.classList.remove('hidden'); }; reader.readAsDataURL(file); };
   $('#deposit-payment-copy').textContent = `Montant choisi : ${formatMoney(amountXof)}. Après paiement sur Wave, cliquez ci-dessous pour transmettre votre référence.`;
   $('#start-deposit-request').onclick = () => {
     $('#deposit-request-form').classList.remove('hidden');
