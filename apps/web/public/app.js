@@ -21,8 +21,10 @@ const formatMoney = (value) => money.format(Number(value ?? 0)).replace('FCFA', 
 const formatDate = (value) => value ? date.format(new Date(value)) : '—';
 const escape = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' })[c]);
 
-async function request(url) {
-  const response = await fetch(url, { credentials: 'same-origin' });
+async function request(url, retried = false) {
+  let response;
+  try { response = await fetch(url, { credentials: 'same-origin' }); } catch { throw new Error('Connexion momentanément indisponible. Réessayez dans un instant.'); }
+  if (response.status === 401 && !retried) { await new Promise((resolve) => setTimeout(resolve, 900)); return request(url, true); }
   if (response.status === 401) { window.location.replace('/app/login.html'); throw new Error('Session requise'); }
   if (!response.ok) throw new Error('Impossible de charger vos données.');
   return response.json();

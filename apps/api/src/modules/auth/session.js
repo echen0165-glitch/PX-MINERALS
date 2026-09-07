@@ -5,7 +5,7 @@ import { generateSessionToken } from './passwords.js';
 
 const SESSION_COOKIE = 'px_session';
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 14;
-const IDLE_TIMEOUT_MINUTES = 30;
+const IDLE_TIMEOUT_MINUTES = 24 * 60;
 
 const tokenHash = (token) => createHash('sha256').update(token).digest('base64url');
 
@@ -54,6 +54,8 @@ export async function requireAuthenticatedUser(request, response, next) {
     }
     request.user = result.rows[0];
     await pool.query('UPDATE sessions SET last_seen_at = now() WHERE token_hash = $1', [tokenHash(token)]);
+    // Une activité légitime prolonge la durée du cookie : le client ne perd pas sa session pendant un simple rafraîchissement.
+    setSessionCookie(response, token);
     return next();
   } catch (error) {
     return next(error);
