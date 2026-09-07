@@ -23,7 +23,9 @@ const escape = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': 
 
 async function request(url, retried = false) {
   let response;
-  try { response = await fetch(url, { credentials: 'same-origin' }); } catch { throw new Error('Connexion momentanément indisponible. Réessayez dans un instant.'); }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try { response = await fetch(url, { credentials: 'same-origin', signal: controller.signal }); } catch (error) { if (!retried) { await new Promise((resolve) => setTimeout(resolve, 700)); return request(url, true); } throw new Error(error.name === 'AbortError' ? 'Le serveur met trop de temps à répondre. Réessayez.' : 'Connexion momentanément indisponible. Réessayez dans un instant.'); } finally { clearTimeout(timeout); }
   if (response.status === 401 && !retried) { await new Promise((resolve) => setTimeout(resolve, 900)); return request(url, true); }
   if (response.status === 401) { window.location.replace('/app/login.html'); throw new Error('Session requise'); }
   if (!response.ok) throw new Error('Impossible de charger vos données.');
@@ -185,7 +187,7 @@ function showView(name) {
 }
 
 async function init() {
-  try { const data = await request('/api/client/dashboard'); renderDashboard(data); renderAccount(await request('/api/client/account')); renderSecurity(await request('/api/client/security')); renderWallet(await request('/api/client/wallet')); renderBonus(await request('/api/bonuses')); renderReferral(await request('/api/referrals')); renderNotifications(await request('/api/notifications')); renderDocuments(await request('/api/documents')); renderTickets(await request('/api/support')); offers = (await request('/api/investments/offers')).offers; renderOffers(); const depositData = await request('/api/deposits'); depositAmounts = depositData.allowedAmounts; waveCheckoutUrl = depositData.checkoutUrl; renderDeposits(); $('#today').textContent = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()); $('#loading').classList.add('hidden'); showView(location.hash.slice(1) || 'dashboard'); } catch (error) { $('#loading').innerHTML = `<p>${escape(error.message)}</p>`; }
+  try { const [data, account, security, wallet, bonus, referral, notifications, documents, tickets, offersData, depositData] = await Promise.all([request('/api/client/dashboard'), request('/api/client/account'), request('/api/client/security'), request('/api/client/wallet'), request('/api/bonuses'), request('/api/referrals'), request('/api/notifications'), request('/api/documents'), request('/api/support'), request('/api/investments/offers'), request('/api/deposits')]); renderDashboard(data); renderAccount(account); renderSecurity(security); renderWallet(wallet); renderBonus(bonus); renderReferral(referral); renderNotifications(notifications); renderDocuments(documents); renderTickets(tickets); offers = offersData.offers; renderOffers(); depositAmounts = depositData.allowedAmounts; waveCheckoutUrl = depositData.checkoutUrl; renderDeposits(); $('#today').textContent = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()); $('#loading').classList.add('hidden'); showView(location.hash.slice(1) || 'dashboard'); } catch (error) { $('#loading').innerHTML = `<div class="load-error"><strong>Chargement interrompu</strong><p>${escape(error.message)}</p><button id="retry-loading" class="auth-submit" type="button">Réessayer</button></div>`; $('#retry-loading').onclick = () => { $('#loading').innerHTML = '<div><div class="loading-spinner"></div><p>Nouvelle tentative…</p></div>'; init(); }; }
 }
 document.querySelectorAll('[data-view]').forEach((link) => link.addEventListener('click', () => setTimeout(() => showView(link.dataset.view), 0)));
 window.addEventListener('hashchange', () => showView(location.hash.slice(1) || 'dashboard'));
