@@ -34,7 +34,16 @@ export function createApp() {
   app.use('/webhooks/wave', express.raw({ type: 'application/json', limit: '100kb' }), waveWebhookRouter);
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
-  app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 200, standardHeaders: 'draft-8', legacyHeaders: false }));
+  app.use(rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 200,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    // Une fonction serverless ne possède pas toujours request.ip. Netlify transmet l’IP via ses en-têtes.
+    keyGenerator: (request) => request.get('x-nf-client-connection-ip')
+      ?? request.get('x-forwarded-for')?.split(',')[0].trim()
+      ?? 'netlify-anonymous'
+  }));
   app.use('/health', healthRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/client', clientRouter);
