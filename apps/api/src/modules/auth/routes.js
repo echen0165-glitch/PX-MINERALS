@@ -12,7 +12,16 @@ import { applyWalletMutation } from '../wallet/ledger.js';
 import { notify } from '../notifications/service.js';
 
 export const authRouter = Router();
-const sensitiveLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false });
+const sensitiveLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 8,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  // Les fonctions Netlify transmettent l’adresse visiteur dans ces en-têtes, pas dans request.ip.
+  keyGenerator: (request) => request.get('x-nf-client-connection-ip')
+    ?? request.get('x-forwarded-for')?.split(',')[0].trim()
+    ?? 'netlify-anonymous'
+});
 const registerSchema = z.object({
   firstName: z.string().trim().min(1).max(100), lastName: z.string().trim().min(1).max(100),
   username: z.string().regex(/^[A-Za-z0-9_-]{3,32}$/), birthDate: z.coerce.date(),
