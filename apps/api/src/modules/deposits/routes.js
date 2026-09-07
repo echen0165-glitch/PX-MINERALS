@@ -15,12 +15,16 @@ depositRouter.get('/', async (request, response, next) => {
   try {
     const deposits = await pool.query(`SELECT d.id, d.amount_xof, d.status, d.requested_at, d.reviewed_at, d.refusal_reason, w.wave_reference, w.client_reference
       FROM deposits d LEFT JOIN wave_transactions w ON w.deposit_id = d.id WHERE d.user_id = $1 ORDER BY d.requested_at DESC`, [request.user.id]);
-    return response.json({ deposits: deposits.rows, allowedAmounts: [...allowedAmounts] });
+    return response.json({ deposits: deposits.rows, allowedAmounts: [...allowedAmounts], checkoutUrl: env.WAVE_DEPOSIT_URL });
   } catch (error) { return next(error); }
 });
 
 depositRouter.post('/', async (request, response, next) => {
-  const parsed = z.object({ amountXof: z.number().int() }).safeParse(request.body);
+  const parsed = z.object({
+    amountXof: z.number().int(),
+    waveReference: z.string().trim().min(3).max(255),
+    payerWaveNumber: z.string().trim().min(8).max(32)
+  }).safeParse(request.body);
   const rawKey = request.get('Idempotency-Key');
   if (!parsed.success || !allowedAmounts.has(parsed.data.amountXof)) return response.status(422).json({ error: { code: 'INVALID_DEPOSIT_AMOUNT', message: 'Le montant doit être une formule de dépôt prédéfinie.' } });
   if (!rawKey || !z.string().uuid().safeParse(rawKey).success) return response.status(400).json({ error: { code: 'IDEMPOTENCY_KEY_REQUIRED', message: 'Clé d’idempotence requise.' } });
@@ -31,7 +35,7 @@ depositRouter.post('/', async (request, response, next) => {
     await client.query('BEGIN');
     try {
       const deposit = await client.query(`INSERT INTO deposits (user_id, amount_xof, idempotency_key) VALUES ($1,$2,$3) RETURNING id`, [request.user.id, parsed.data.amountXof, rawKey]);
-      await client.query(`INSERT INTO wave_transactions (deposit_id, direction, client_reference, payment_url, raw_response) VALUES ($1,'incoming',$2,$3,$4)`, [deposit.rows[0].id, reference, env.WAVE_DEPOSIT_URL, { integration: 'static-payment-link', automaticValidation: false }]);
+      await client.query(`INSERT INTO wave_transactions (deposit_id, direction, client_reference, wave_reference, payment_url, raw_response) VALUES ($1,'incoming',$2,$3,$4,$5)`, [deposit.rows[0].id, reference, parsed.data.waveReference, env.WAVE_DEPOSIT_URL, { integration: 'static-payment-link', automaticValidation: false, payerWaveNumber: parsed.data.payerWaveNumber }]);
       await notify(client, { userId: request.user.id, title: 'Dépôt en attente', message: `Votre demande de dépôt de ${parsed.data.amountXof} FCFA attend une vérification.`, link: '#wallet' });
       await client.query('COMMIT');
       return response.status(201).json({ depositId: deposit.rows[0].id, clientReference: reference, checkoutUrl: env.WAVE_DEPOSIT_URL, status: 'pending', message: 'Demande créée. Le solde reste inchangé jusqu’à vérification et validation.' });

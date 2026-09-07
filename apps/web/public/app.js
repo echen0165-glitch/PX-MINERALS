@@ -6,6 +6,7 @@ let dashboard;
 let offers = [];
 let activeTerm = 'short';
 let depositAmounts = [];
+let waveCheckoutUrl = '';
 let bonusData;
 let referralData;
 let notificationsData;
@@ -92,17 +93,32 @@ async function buyOffer(offerId) {
 
 function renderDeposits() {
   $('#deposit-amounts').innerHTML = depositAmounts.map((amount) => `<article class="offer-card"><span class="ore">↓</span><h3>${formatMoney(amount)}</h3><p>Versement Wave</p><button data-deposit="${amount}">Choisir ce montant</button></article>`).join('');
-  document.querySelectorAll('[data-deposit]').forEach((button) => button.addEventListener('click', () => createDeposit(Number(button.dataset.deposit))));
+  document.querySelectorAll('[data-deposit]').forEach((button) => button.addEventListener('click', () => startWavePayment(Number(button.dataset.deposit))));
+  const selectedAmount = Number(localStorage.getItem('pxDepositAmount'));
+  if (selectedAmount && depositAmounts.includes(selectedAmount)) showDepositRequest(selectedAmount);
 }
-async function createDeposit(amountXof) {
-  if (!window.confirm(`Créer une demande de dépôt de ${formatMoney(amountXof)} ?`)) return;
-  const response = await fetch('/api/deposits', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ amountXof }) });
-  const payload = await response.json();
-  if (!response.ok) { alert(payload.error?.message ?? 'Demande impossible.'); return; }
+function startWavePayment(amountXof) {
+  if (!waveCheckoutUrl) return alert('Le lien Wave Business est momentanément indisponible. Réessayez dans un instant.');
+  localStorage.setItem('pxDepositAmount', String(amountXof));
+  window.location.assign(waveCheckoutUrl);
+}
+function showDepositRequest(amountXof) {
   $('#deposit-payment').classList.remove('hidden');
-  $('#deposit-payment-copy').textContent = `Demande ${payload.clientReference} · montant à payer : ${formatMoney(amountXof)}. Utilisez le lien officiel Wave Business ci-dessous.`;
-  $('#wave-payment-link').href = payload.checkoutUrl;
-  $('#deposit-payment').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  $('#deposit-payment-copy').textContent = `Montant choisi : ${formatMoney(amountXof)}. Après paiement sur Wave, cliquez ci-dessous pour transmettre votre référence.`;
+  $('#start-deposit-request').onclick = () => {
+    $('#deposit-request-form').classList.remove('hidden');
+    $('#start-deposit-request').classList.add('hidden');
+  };
+  $('#deposit-request-form').onsubmit = async (event) => {
+    event.preventDefault();
+    const response = await fetch('/api/deposits', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ amountXof, waveReference: $('#deposit-wave-reference').value.trim(), payerWaveNumber: $('#deposit-payer-number').value.trim() }) });
+  const payload = await response.json();
+    if (!response.ok) { alert(payload.error?.message ?? 'Demande impossible.'); return; }
+    localStorage.removeItem('pxDepositAmount');
+    $('#deposit-request-form').classList.add('hidden');
+    $('#deposit-payment-copy').textContent = `Demande ${payload.clientReference} envoyée. Votre dépôt est en attente de vérification.`;
+    alert('Votre demande de dépôt a été envoyée. Elle sera vérifiée avant tout crédit du portefeuille.');
+  };
 }
 function renderWithdrawalQuote() {
   const amount = Number($('#withdrawal-amount').value);
@@ -154,7 +170,7 @@ function showView(name) {
 }
 
 async function init() {
-  try { const data = await request('/api/client/dashboard'); renderDashboard(data); renderAccount(await request('/api/client/account')); renderSecurity(await request('/api/client/security')); renderWallet(await request('/api/client/wallet')); renderBonus(await request('/api/bonuses')); renderReferral(await request('/api/referrals')); renderNotifications(await request('/api/notifications')); renderDocuments(await request('/api/documents')); renderTickets(await request('/api/support')); offers = (await request('/api/investments/offers')).offers; renderOffers(); depositAmounts = (await request('/api/deposits')).allowedAmounts; renderDeposits(); $('#today').textContent = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()); $('#loading').classList.add('hidden'); showView(location.hash.slice(1) || 'dashboard'); } catch (error) { $('#loading').innerHTML = `<p>${escape(error.message)}</p>`; }
+  try { const data = await request('/api/client/dashboard'); renderDashboard(data); renderAccount(await request('/api/client/account')); renderSecurity(await request('/api/client/security')); renderWallet(await request('/api/client/wallet')); renderBonus(await request('/api/bonuses')); renderReferral(await request('/api/referrals')); renderNotifications(await request('/api/notifications')); renderDocuments(await request('/api/documents')); renderTickets(await request('/api/support')); offers = (await request('/api/investments/offers')).offers; renderOffers(); const depositData = await request('/api/deposits'); depositAmounts = depositData.allowedAmounts; waveCheckoutUrl = depositData.checkoutUrl; renderDeposits(); $('#today').textContent = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()); $('#loading').classList.add('hidden'); showView(location.hash.slice(1) || 'dashboard'); } catch (error) { $('#loading').innerHTML = `<p>${escape(error.message)}</p>`; }
 }
 document.querySelectorAll('[data-view]').forEach((link) => link.addEventListener('click', () => setTimeout(() => showView(link.dataset.view), 0)));
 window.addEventListener('hashchange', () => showView(location.hash.slice(1) || 'dashboard'));
