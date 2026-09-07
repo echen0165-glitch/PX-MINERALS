@@ -32,3 +32,5 @@ const baseAdminLoad=load;
 load=async()=>{if(!location.hash.startsWith('#ticket-'))return baseAdminLoad();try{view='supportDetail';document.querySelector('#admin').innerHTML=await supportDetail();document.querySelectorAll('[data-view]').forEach(button=>{button.onclick=()=>{location.hash='';view=button.dataset.view;load()}})}catch(error){alert(error.message)}};
 document.addEventListener('click',event=>{const button=event.target.closest('[data-support-ticket]');if(!button)return;location.hash=`ticket-${button.dataset.supportTicket}`;load()});
 document.addEventListener('submit',async event=>{if(event.target.id!=='support-reply-form')return;event.preventDefault();try{const id=location.hash.slice(1).replace('ticket-','');await api(`/api/admin/support/${id}/messages`,{method:'POST',body:JSON.stringify({message:document.querySelector('#support-reply').value.trim()})});load()}catch(error){alert(error.message)}});
+let adminRefreshInFlight = false;
+setInterval(async () => { if (adminRefreshInFlight || !document.querySelector('.shell')) return; adminRefreshInFlight = true; try { await load(); } finally { adminRefreshInFlight = false; } }, 15000);
