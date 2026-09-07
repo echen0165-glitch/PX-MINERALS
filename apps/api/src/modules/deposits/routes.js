@@ -28,22 +28,24 @@ depositRouter.post('/', async (request, response, next) => {
   const rawKey = request.get('Idempotency-Key');
   if (!parsed.success || !allowedAmounts.has(parsed.data.amountXof)) return response.status(422).json({ error: { code: 'INVALID_DEPOSIT_AMOUNT', message: 'Le montant doit être une formule de dépôt prédéfinie.' } });
   if (!rawKey || !z.string().uuid().safeParse(rawKey).success) return response.status(400).json({ error: { code: 'IDEMPOTENCY_KEY_REQUIRED', message: 'Clé d’idempotence requise.' } });
+  let client;
   try {
     const previous = await pool.query(`SELECT d.id, w.payment_url FROM deposits d LEFT JOIN wave_transactions w ON w.deposit_id = d.id WHERE d.user_id = $1 AND d.idempotency_key = $2`, [request.user.id, rawKey]);
     if (previous.rowCount) return response.status(200).json({ depositId: previous.rows[0].id, checkoutUrl: previous.rows[0].payment_url, idempotent: true });
     const reference = `PXDEP-${randomUUID().replaceAll('-', '').slice(0, 16).toUpperCase()}`;
+    client = await pool.connect();
     await client.query('BEGIN');
     try {
       const deposit = await client.query(`INSERT INTO deposits (user_id, amount_xof, idempotency_key) VALUES ($1,$2,$3) RETURNING id`, [request.user.id, parsed.data.amountXof, rawKey]);
       await client.query(`INSERT INTO wave_transactions (deposit_id, direction, client_reference, wave_reference, payment_url, raw_response) VALUES ($1,'incoming',$2,$3,$4,$5)`, [deposit.rows[0].id, reference, parsed.data.waveReference, env.WAVE_DEPOSIT_URL, { integration: 'static-payment-link', automaticValidation: false, payerWaveNumber: parsed.data.payerWaveNumber, paymentScreenshot: parsed.data.paymentScreenshot }]);
-      await notify(client, { userId: request.user.id, title: 'Dépôt en attente', message: `Votre demande de dépôt de ${parsed.data.amountXof} FCFA attend une vérification.`, link: '#wallet' });
+      try { await notify(client, { userId: request.user.id, title: 'Dépôt en attente', message: `Votre demande de dépôt de ${parsed.data.amountXof} FCFA attend une vérification.`, link: '#wallet' }); } catch (notificationError) { console.warn('PX_MINERALS_DEPOSIT_NOTIFICATION_FAILED', notificationError.message); }
       await client.query('COMMIT');
       return response.status(201).json({ depositId: deposit.rows[0].id, clientReference: reference, checkoutUrl: env.WAVE_DEPOSIT_URL, status: 'pending', message: 'Demande créée. Le solde reste inchangé jusqu’à vérification et validation.' });
     } catch (error) { await client.query('ROLLBACK'); throw error; }
   } catch (error) {
     if (error.code === '23505') return response.status(409).json({ error: { code: 'DUPLICATE_DEPOSIT', message: 'Cette demande existe déjà.' } });
     return next(error);
-  } finally { client.release(); }
+  } finally { client?.release(); }
 });
 
 // Intentionally does not credit a wallet. Real Wave signature verification and API credentials are required first.
