@@ -125,6 +125,7 @@ function showDepositRequest(amountXof) {
     if (!file) return alert('Ajoutez la capture d’écran du paiement Wave.');
     if (file.size > 2200000) return alert('La capture est trop volumineuse. Choisissez une image de moins de 2 Mo.');
     const paymentScreenshot = await compressDepositScreenshot(file);
+    if (paymentScreenshot.length > 1450000) return alert('La capture reste trop volumineuse après compression. Recadrez-la ou choisissez une image plus légère.');
     const response = await fetch('/api/deposits', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ amountXof, waveReference: $('#deposit-wave-reference').value.trim(), payerWaveNumber: $('#deposit-payer-number').value.trim(), paymentScreenshot }) });
   const payload = await response.json();
     if (!response.ok) { alert(payload.error?.message ?? 'Demande impossible.'); return; }
