@@ -32,7 +32,7 @@ export function createApp() {
   app.use(helmet());
   app.use(cors({ origin: env.APP_ORIGIN, credentials: true, methods: ['GET', 'POST', 'PATCH', 'DELETE'] }));
   app.use('/webhooks/wave', express.raw({ type: 'application/json', limit: '100kb' }), waveWebhookRouter);
-  app.use(express.json({ limit: '100kb' }));
+  app.use(express.json({ limit: '2mb' }));
   app.use(cookieParser());
   app.use(rateLimit({
     windowMs: 15 * 60 * 1000,
