@@ -24,9 +24,10 @@ import { fileURLToPath } from 'node:url';
 
 export function createApp() {
   const app = express();
-  const directory = path.dirname(fileURLToPath(import.meta.url));
   // En local, les fichiers sont voisins de l’API. Sur Netlify, ils sont inclus depuis la racine du projet.
-  const assetsDirectory = process.env.NETLIFY ? path.resolve(process.cwd(), 'apps') : path.resolve(directory, '../..');
+  const assetsDirectory = process.env.NETLIFY
+    ? path.resolve(process.cwd(), 'apps')
+    : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
   app.disable('x-powered-by');
   app.use(pinoHttp({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie'] }));
   app.use(helmet());
