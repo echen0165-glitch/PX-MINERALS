@@ -4,5 +4,12 @@ export function notFoundHandler(request, response) {
 
 export function errorHandler(error, request, response, next) { // eslint-disable-line no-unused-vars
   request.log?.error({ err: error }, 'Unhandled request error');
+  const unavailableCodes = new Set(['ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'ETIMEDOUT', '08000', '08001', '08003', '08006', '53300', '57P01', '57P03']);
+  if (unavailableCodes.has(error.code)) {
+    return response.status(503).json({ error: {
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Le service est temporairement indisponible. Réessayez dans quelques instants.'
+    } });
+  }
   response.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Une erreur interne est survenue.' } });
 }
