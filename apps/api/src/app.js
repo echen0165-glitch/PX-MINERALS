@@ -1,0 +1,56 @@
+import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import express from 'express';
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import pinoHttp from 'pino-http';
+import { env } from './config/env.js';
+import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
+import { healthRouter } from './routes/health.js';
+import { authRouter } from './modules/auth/routes.js';
+import { clientRouter } from './modules/client/routes.js';
+import { investmentRouter } from './modules/investments/routes.js';
+import { depositRouter } from './modules/deposits/routes.js';
+import { waveWebhookRouter } from './modules/deposits/wave-webhook.js';
+import { withdrawalRouter } from './modules/withdrawals/routes.js';
+import { bonusRouter } from './modules/bonuses/routes.js';
+import { referralRouter } from './modules/referrals/routes.js';
+import { notificationRouter } from './modules/notifications/routes.js';
+import { documentRouter } from './modules/documents/routes.js';
+import { supportRouter } from './modules/support/routes.js';
+import { adminRouter } from './modules/admin/routes.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export function createApp() {
+  const app = express();
+  const directory = path.dirname(fileURLToPath(import.meta.url));
+  // En local, les fichiers sont voisins de l’API. Sur Netlify, ils sont inclus depuis la racine du projet.
+  const assetsDirectory = process.env.NETLIFY ? path.resolve(process.cwd(), 'apps') : path.resolve(directory, '../..');
+  app.disable('x-powered-by');
+  app.use(pinoHttp({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie'] }));
+  app.use(helmet());
+  app.use(cors({ origin: env.APP_ORIGIN, credentials: true, methods: ['GET', 'POST', 'PATCH', 'DELETE'] }));
+  app.use('/webhooks/wave', express.raw({ type: 'application/json', limit: '100kb' }), waveWebhookRouter);
+  app.use(express.json({ limit: '100kb' }));
+  app.use(cookieParser());
+  app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 200, standardHeaders: 'draft-8', legacyHeaders: false }));
+  app.use('/health', healthRouter);
+  app.use('/api/auth', authRouter);
+  app.use('/api/client', clientRouter);
+  app.use('/api/investments', investmentRouter);
+  app.use('/api/deposits', depositRouter);
+  app.use('/api/withdrawals', withdrawalRouter);
+  app.use('/api/bonuses', bonusRouter);
+  app.use('/api/referrals', referralRouter);
+  app.use('/api/notifications', notificationRouter);
+  app.use('/api/documents', documentRouter);
+  app.use('/api/support', supportRouter);
+  app.use('/api/admin', adminRouter);
+  app.use('/admin', express.static(path.resolve(assetsDirectory, 'admin/public')));
+  app.use('/app', express.static(path.resolve(assetsDirectory, 'web/public')));
+  app.use(express.static(path.resolve(assetsDirectory, 'public')));
+  app.use(notFoundHandler);
+  app.use(errorHandler);
+  return app;
+}

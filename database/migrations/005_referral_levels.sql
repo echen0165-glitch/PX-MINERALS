@@ -1,0 +1,3 @@
+ALTER TABLE referrals DROP CONSTRAINT referrals_referred_user_id_key;
+ALTER TABLE referral_commissions DROP CONSTRAINT referral_commissions_qualifying_deposit_id_key;
+ALTER TABLE referral_commissions ADD CONSTRAINT referral_commission_unique UNIQUE (referral_id, qualifying_deposit_id);
