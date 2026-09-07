@@ -20,14 +20,11 @@ import { documentRouter } from './modules/documents/routes.js';
 import { supportRouter } from './modules/support/routes.js';
 import { adminRouter } from './modules/admin/routes.js';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 export function createApp() {
   const app = express();
-  // En local, les fichiers sont voisins de l’API. Sur Netlify, ils sont inclus depuis la racine du projet.
-  const assetsDirectory = process.env.NETLIFY
-    ? path.resolve(process.cwd(), 'apps')
-    : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  // Le dossier de travail est la racine du projet, localement comme dans la fonction Netlify.
+  const assetsDirectory = path.resolve(process.cwd(), 'apps');
   app.disable('x-powered-by');
   app.use(pinoHttp({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie'] }));
   app.use(helmet());
