@@ -1,5 +1,4 @@
 import '/app/favicon.js';
-import '/app/deposit-proof.css';
 
 const loadingWatchdog = setTimeout(() => {
   const loading = document.querySelector('#loading');
