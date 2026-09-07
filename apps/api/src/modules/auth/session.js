@@ -37,7 +37,10 @@ export function clearSessionCookie(response) {
 export async function requireAuthenticatedUser(request, response, next) {
   try {
     const token = request.cookies[SESSION_COOKIE];
-    if (!token) return response.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentification requise.' } });
+    if (!token) {
+      console.info('PX_MINERALS_SESSION_REJECTED reason=missing_cookie');
+      return response.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentification requise.' } });
+    }
     const result = await pool.query(
       `SELECT u.id, u.role, u.status, u.email, u.username, u.client_code, s.second_factor_verified_at
        FROM sessions s JOIN users u ON u.id = s.user_id
@@ -46,6 +49,7 @@ export async function requireAuthenticatedUser(request, response, next) {
       [tokenHash(token)]
     );
     if (result.rowCount !== 1 || result.rows[0].status !== 'active') {
+      console.info(`PX_MINERALS_SESSION_REJECTED reason=${result.rowCount !== 1 ? 'invalid_or_expired' : 'inactive_account'}`);
       return response.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Session invalide.' } });
     }
     request.user = result.rows[0];
