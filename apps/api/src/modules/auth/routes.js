@@ -90,7 +90,13 @@ authRouter.post('/verify-email', sensitiveLimit, async (request, response, next)
   try {
     await client.query('BEGIN');
     const verification = await client.query(`SELECT ev.*, u.email FROM email_verifications ev JOIN users u ON u.id = ev.user_id WHERE u.email = lower($1) AND ev.consumed_at IS NULL ORDER BY ev.created_at DESC LIMIT 1 FOR UPDATE`, [input.email]);
-    if (verification.rowCount !== 1 || verification.rows[0].expires_at < new Date() || verification.rows[0].attempts >= 5 || !(await verifySecret(input.code, verification.rows[0].code_hash))) {
+    const verificationRow = verification.rows[0];
+    const codeMatches = verification.rowCount === 1 && await verifySecret(input.code, verificationRow.code_hash);
+    if (verification.rowCount !== 1 || verificationRow.expires_at < new Date() || verificationRow.attempts >= 5 || !codeMatches) {
+      const reason = verification.rowCount !== 1 ? 'missing'
+        : verificationRow.expires_at < new Date() ? 'expired'
+          : verificationRow.attempts >= 5 ? 'max_attempts' : 'mismatch';
+      console.info(`PX_MINERALS_VERIFICATION_REJECTED reason=${reason}`);
       if (verification.rowCount) await client.query('UPDATE email_verifications SET attempts = attempts + 1 WHERE id = $1', [verification.rows[0].id]);
       await client.query('COMMIT'); return response.status(422).json({ error: { code: 'INVALID_CODE', message: 'Code invalide ou expiré.' } });
     }
