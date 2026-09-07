@@ -1,6 +1,13 @@
 import '/app/favicon.js';
 import '/app/deposit-proof.css';
 
+const loadingWatchdog = setTimeout(() => {
+  const loading = document.querySelector('#loading');
+  if (loading && !loading.classList.contains('hidden')) loading.innerHTML = '<div class="load-error"><strong>Le chargement prend trop de temps</strong><p>Le serveur ne répond pas assez vite. Votre session n’est pas supprimée.</p><button id="retry-loading" class="auth-submit" type="button">Réessayer</button></div>';
+  const retry = document.querySelector('#retry-loading');
+  if (retry) retry.onclick = () => window.location.reload();
+}, 15000);
+
 const money = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 });
 const date = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
 let dashboard;
@@ -187,7 +194,7 @@ function showView(name) {
 }
 
 async function init() {
-  try { const [data, account, security, wallet, bonus, referral, notifications, documents, tickets, offersData, depositData] = await Promise.all([request('/api/client/dashboard'), request('/api/client/account'), request('/api/client/security'), request('/api/client/wallet'), request('/api/bonuses'), request('/api/referrals'), request('/api/notifications'), request('/api/documents'), request('/api/support'), request('/api/investments/offers'), request('/api/deposits')]); renderDashboard(data); renderAccount(account); renderSecurity(security); renderWallet(wallet); renderBonus(bonus); renderReferral(referral); renderNotifications(notifications); renderDocuments(documents); renderTickets(tickets); offers = offersData.offers; renderOffers(); depositAmounts = depositData.allowedAmounts; waveCheckoutUrl = depositData.checkoutUrl; renderDeposits(); $('#today').textContent = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()); $('#loading').classList.add('hidden'); showView(location.hash.slice(1) || 'dashboard'); } catch (error) { $('#loading').innerHTML = `<div class="load-error"><strong>Chargement interrompu</strong><p>${escape(error.message)}</p><button id="retry-loading" class="auth-submit" type="button">Réessayer</button></div>`; $('#retry-loading').onclick = () => { $('#loading').innerHTML = '<div><div class="loading-spinner"></div><p>Nouvelle tentative…</p></div>'; init(); }; }
+  try { const [data, account, security, wallet, bonus, referral, notifications, documents, tickets, offersData, depositData] = await Promise.all([request('/api/client/dashboard'), request('/api/client/account'), request('/api/client/security'), request('/api/client/wallet'), request('/api/bonuses'), request('/api/referrals'), request('/api/notifications'), request('/api/documents'), request('/api/support'), request('/api/investments/offers'), request('/api/deposits')]); renderDashboard(data); renderAccount(account); renderSecurity(security); renderWallet(wallet); renderBonus(bonus); renderReferral(referral); renderNotifications(notifications); renderDocuments(documents); renderTickets(tickets); offers = offersData.offers; renderOffers(); depositAmounts = depositData.allowedAmounts; waveCheckoutUrl = depositData.checkoutUrl; renderDeposits(); $('#today').textContent = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()); clearTimeout(loadingWatchdog); $('#loading').classList.add('hidden'); showView(location.hash.slice(1) || 'dashboard'); } catch (error) { clearTimeout(loadingWatchdog); $('#loading').innerHTML = `<div class="load-error"><strong>Chargement interrompu</strong><p>${escape(error.message)}</p><button id="retry-loading" class="auth-submit" type="button">Réessayer</button></div>`; $('#retry-loading').onclick = () => { $('#loading').innerHTML = '<div><div class="loading-spinner"></div><p>Nouvelle tentative…</p></div>'; init(); }; }
 }
 document.querySelectorAll('[data-view]').forEach((link) => link.addEventListener('click', () => setTimeout(() => showView(link.dataset.view), 0)));
 window.addEventListener('hashchange', () => showView(location.hash.slice(1) || 'dashboard'));
