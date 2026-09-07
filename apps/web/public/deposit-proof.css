@@ -1,0 +1,5 @@
+.deposit-payment{background:linear-gradient(135deg,#fff 0%,#f0f7ff 100%);box-shadow:0 16px 36px rgba(22,91,170,.1)}
+.deposit-payment form label{padding:12px;border:1px solid #e1edf8;border-radius:12px;background:#fff}
+.deposit-payment input[type=file]{padding:10px;background:#f7fbff;border:1px dashed #a9c9e8;cursor:pointer}
+.file-help{font-size:11px;color:#7892ad;font-weight:500}
+.deposit-screenshot-preview{max-width:220px;max-height:150px;border-radius:10px;border:1px solid #d6e7f6;object-fit:cover;margin-top:4px}

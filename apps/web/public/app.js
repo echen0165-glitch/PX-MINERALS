@@ -1,4 +1,5 @@
 import '/app/favicon.js';
+import '/app/deposit-proof.css';
 
 const money = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 });
 const date = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
@@ -102,8 +103,15 @@ function startWavePayment(amountXof) {
   localStorage.setItem('pxDepositAmount', String(amountXof));
   window.location.assign(waveCheckoutUrl);
 }
+function compressDepositScreenshot(file) {
+  return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onerror = reject; reader.onload = () => { const image = new Image(); image.onerror = reject; image.onload = () => { const scale = Math.min(1, 1200 / Math.max(image.width, image.height)); const canvas = document.createElement('canvas'); canvas.width = Math.round(image.width * scale); canvas.height = Math.round(image.height * scale); canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height); resolve(canvas.toDataURL('image/jpeg', .78)); }; image.src = reader.result; }; reader.readAsDataURL(file); });
+}
 function showDepositRequest(amountXof) {
   $('#deposit-payment').classList.remove('hidden');
+  const form = $('#deposit-request-form');
+  if (!$('#deposit-request-amount')) form.insertAdjacentHTML('afterbegin', `<label>Montant de la demande<input id="deposit-request-amount" value="${formatMoney(amountXof)}" readonly></label>`);
+  if (!$('#deposit-screenshot')) form.insertAdjacentHTML('beforeend', '<label>Capture d’écran du paiement<input id="deposit-screenshot" type="file" accept="image/png,image/jpeg,image/webp" required><small class="file-help">Ajoutez la capture visible dans votre application Wave.</small><img id="deposit-screenshot-preview" class="deposit-screenshot-preview hidden" alt="Aperçu de la capture de paiement"></label>');
+  $('#deposit-screenshot').onchange = () => { const file = $('#deposit-screenshot').files?.[0]; const preview = $('#deposit-screenshot-preview'); if (!file) return preview.classList.add('hidden'); preview.src = URL.createObjectURL(file); preview.classList.remove('hidden'); };
   $('#deposit-payment-copy').textContent = `Montant choisi : ${formatMoney(amountXof)}. Après paiement sur Wave, cliquez ci-dessous pour transmettre votre référence.`;
   $('#start-deposit-request').onclick = () => {
     $('#deposit-request-form').classList.remove('hidden');
@@ -111,7 +119,11 @@ function showDepositRequest(amountXof) {
   };
   $('#deposit-request-form').onsubmit = async (event) => {
     event.preventDefault();
-    const response = await fetch('/api/deposits', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ amountXof, waveReference: $('#deposit-wave-reference').value.trim(), payerWaveNumber: $('#deposit-payer-number').value.trim() }) });
+    const file = $('#deposit-screenshot').files?.[0];
+    if (!file) return alert('Ajoutez la capture d’écran du paiement Wave.');
+    if (file.size > 2200000) return alert('La capture est trop volumineuse. Choisissez une image de moins de 2 Mo.');
+    const paymentScreenshot = await compressDepositScreenshot(file);
+    const response = await fetch('/api/deposits', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ amountXof, waveReference: $('#deposit-wave-reference').value.trim(), payerWaveNumber: $('#deposit-payer-number').value.trim(), paymentScreenshot }) });
   const payload = await response.json();
     if (!response.ok) { alert(payload.error?.message ?? 'Demande impossible.'); return; }
     localStorage.removeItem('pxDepositAmount');
