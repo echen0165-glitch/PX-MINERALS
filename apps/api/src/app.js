@@ -28,7 +28,7 @@ export function createApp() {
   app.disable('x-powered-by');
   // Netlify transmet l’adresse du visiteur via son proxy ; nécessaire au limiteur de requêtes.
   app.set('trust proxy', 1);
-  app.use(pinoHttp({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie'] }));
+  app.use(pinoHttp({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers.x-admin-setup-token'] }));
   app.use(helmet());
   app.use(cors({ origin: env.APP_ORIGIN, credentials: true, methods: ['GET', 'POST', 'PATCH', 'DELETE'] }));
   app.use('/webhooks/wave', express.raw({ type: 'application/json', limit: '100kb' }), waveWebhookRouter);

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
@@ -84,6 +84,39 @@ authRouter.get('/username-availability', async (request, response, next) => {
 });
 
 const codeSchema = z.object({ email: z.string().email(), code: z.string().regex(/^\d{6}$/) });
+const bootstrapAdminSchema = z.object({
+  firstName: z.string().trim().min(1).max(100), lastName: z.string().trim().min(1).max(100),
+  username: z.string().regex(/^[A-Za-z0-9_-]{3,32}$/), email: z.string().trim().email().max(320),
+  waveNumber: z.string().trim().min(8).max(32), password: z.string(), passwordConfirmation: z.string()
+}).superRefine((value, context) => {
+  if (!passwordIsValid(value.password)) context.addIssue({ code: 'custom', path: ['password'], message: 'Le mot de passe doit contenir au moins 10 caractères, une lettre et un chiffre.' });
+  if (value.password !== value.passwordConfirmation) context.addIssue({ code: 'custom', path: ['passwordConfirmation'], message: 'Les mots de passe ne correspondent pas.' });
+});
+
+authRouter.post('/bootstrap-admin', sensitiveLimit, async (request, response, next) => {
+  const input = parse(bootstrapAdminSchema, request.body, response); if (!input) return;
+  const suppliedToken = request.get('x-admin-setup-token') ?? '';
+  const expectedToken = env.ADMIN_SETUP_TOKEN ?? '';
+  const tokenValid = suppliedToken.length === expectedToken.length && expectedToken.length > 0 && timingSafeEqual(Buffer.from(suppliedToken), Buffer.from(expectedToken));
+  if (!tokenValid) return response.status(403).json({ error: { code: 'SETUP_FORBIDDEN', message: 'Secret de configuration invalide.' } });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    if ((await client.query("SELECT 1 FROM users WHERE role = 'admin' LIMIT 1")).rowCount) {
+      await client.query('ROLLBACK'); return response.status(409).json({ error: { code: 'ADMIN_EXISTS', message: 'Le premier administrateur existe déjà.' } });
+    }
+    const secret = new OTPAuth.Secret({ size: 20 }).base32;
+    const user = await client.query(
+      `INSERT INTO users (role,first_name,last_name,username,email,password_hash,birth_date,wave_number,client_code,status,email_verified_at)
+       VALUES ('admin',$1,$2,$3,lower($4),$5,'1970-01-01',$6,$7,'active',now()) RETURNING id`,
+      [input.firstName, input.lastName, input.username, input.email, await hashSecret(input.password), input.waveNumber, `PX-ADMIN-${randomUUID().slice(0, 8).toUpperCase()}`]
+    );
+    await client.query('INSERT INTO admin_totp_credentials (user_id,secret) VALUES ($1,$2)', [user.rows[0].id, secret]);
+    await client.query('COMMIT');
+    return response.status(201).json({ message: 'Administrateur créé.', totpSecret: secret });
+  } catch (error) { await client.query('ROLLBACK'); if (error.code === '23505') return response.status(409).json({ error: { code: 'ACCOUNT_EXISTS', message: 'Cet e-mail ou ce pseudo est déjà utilisé.' } }); return next(error); } finally { client.release(); }
+});
+
 authRouter.post('/verify-email', sensitiveLimit, async (request, response, next) => {
   const input = parse(codeSchema, request.body, response); if (!input) return;
   const client = await pool.connect();

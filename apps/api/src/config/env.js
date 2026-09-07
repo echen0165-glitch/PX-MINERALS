@@ -13,6 +13,7 @@ const envSchema = z.object({
   EMAIL_PROVIDER: z.string().optional(),
   EMAIL_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().email().optional(),
+  ADMIN_SETUP_TOKEN: z.string().min(24).optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info')
 });
 
