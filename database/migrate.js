@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
-const connectionString = process.env.DATABASE_URL;
+// En production serverless, the app uses the Supabase transaction pooler.
+// Migrations may use a separate (session/direct) connection when provided.
+const connectionString = process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL;
 if (!connectionString) throw new Error('DATABASE_URL is required to run migrations.');
 
 const client = new pg.Client({ connectionString, ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false });
