@@ -13,7 +13,7 @@ depositRouter.use(requireAuthenticatedUser);
 depositRouter.get('/', async (request, response, next) => {
   const client = await pool.connect();
   try {
-    const deposits = await pool.query(`SELECT d.id, d.amount_xof, d.status, d.requested_at, d.reviewed_at, d.refusal_reason, w.wave_reference, w.client_reference
+    const deposits = await pool.query(`SELECT d.id, d.amount_xof, d.status, d.requested_at, d.reviewed_at, d.refusal_reason, w.wave_reference, w.client_reference, w.raw_response->>'payerWaveNumber' AS payer_wave_number
       FROM deposits d LEFT JOIN wave_transactions w ON w.deposit_id = d.id WHERE d.user_id = $1 ORDER BY d.requested_at DESC`, [request.user.id]);
     return response.json({ deposits: deposits.rows, allowedAmounts: [...allowedAmounts], checkoutUrl: env.WAVE_DEPOSIT_URL });
   } catch (error) { return next(error); }
