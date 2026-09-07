@@ -2,6 +2,7 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import { env } from '../../config/env.js';
 import { pool } from '../../config/database.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from './mailer.js';
 import { generateNumericCode, hashSecret, passwordIsValid, verifySecret } from './passwords.js';
