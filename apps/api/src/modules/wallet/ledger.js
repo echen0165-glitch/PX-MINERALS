@@ -10,6 +10,9 @@ const columns = { available: 'available_balance', pending: 'pending_balance', bo
 export async function applyWalletMutation(client, { userId, type, bucket = 'available', amountXof, deltas = null, status = 'completed', reference = null, idempotencyKey = randomUUID(), reason, metadata = {} }) {
   if (!buckets.has(bucket)) throw new Error('INVALID_WALLET_BUCKET');
   if (!Number.isSafeInteger(amountXof) || amountXof === 0) throw new Error('INVALID_WALLET_AMOUNT');
+  // Older accounts may predate wallet provisioning. Creating the zeroed row
+  // here keeps every financial operation recoverable and idempotent.
+  await client.query('INSERT INTO wallets (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [userId]);
   const wallet = await client.query('SELECT * FROM wallets WHERE user_id = $1 FOR UPDATE', [userId]);
   if (wallet.rowCount !== 1) throw new Error('WALLET_NOT_FOUND');
   const delta = { available: 0, pending: 0, bonus: 0, signup_bonus: 0, referral: 0, ...(deltas ?? { [bucket]: amountXof }) };
