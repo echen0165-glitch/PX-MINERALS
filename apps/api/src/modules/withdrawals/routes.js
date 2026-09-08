@@ -20,7 +20,7 @@ withdrawalRouter.post('/', async (request, response, next) => {
   const parsed = z.object({ amountXof: z.number().int().positive() }).safeParse(request.body);
   const idempotencyKey = request.get('Idempotency-Key');
   if (!parsed.success) return response.status(422).json({ error: { code: 'INVALID_WITHDRAWAL_AMOUNT', message: 'Montant invalide.' } });
-  if (parsed.data.amountXof < 2000000) return response.status(422).json({ error: { code: 'MINIMUM_WITHDRAWAL', message: 'Le montant minimum d’un retrait est de 2 000 000 FCFA.' } });
+  if (parsed.data.amountXof < 2000) return response.status(422).json({ error: { code: 'MINIMUM_WITHDRAWAL', message: 'Le montant minimum d’un retrait est de 2 000 FCFA.' } });
   if (!idempotencyKey || !z.string().uuid().safeParse(idempotencyKey).success) return response.status(400).json({ error: { code: 'IDEMPOTENCY_KEY_REQUIRED', message: 'Clé d’idempotence requise.' } });
   const client = await pool.connect();
   try {
