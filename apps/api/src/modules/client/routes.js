@@ -11,7 +11,7 @@ clientRouter.get('/dashboard', async (request, response, next) => {
     const [profile, wallet, investments, notifications, referral, recent] = await Promise.all([
       pool.query(`SELECT first_name, last_name, username, client_code, avatar_key, created_at FROM users WHERE id = $1`, [request.user.id]),
       pool.query(`SELECT available_balance, pending_balance, bonus_balance, signup_bonus_balance, referral_balance, total_gains_received FROM wallets WHERE user_id = $1`, [request.user.id]),
-      pool.query(`SELECT i.id, o.mineral_name, o.term, i.price_xof, i.daily_gain_xof, i.purchased_at, i.ends_at, i.next_gain_at, i.status, i.gains_received_xof FROM investments i JOIN mineral_offers o ON o.id = i.offer_id WHERE i.user_id = $1 ORDER BY i.purchased_at DESC LIMIT 100`, [request.user.id]),
+      pool.query(`SELECT i.id, o.mineral_name, o.term, i.price_xof, i.duration_days, i.daily_gain_xof, i.purchased_at, i.ends_at, i.next_gain_at, i.status, i.gains_received_xof FROM investments i JOIN mineral_offers o ON o.id = i.offer_id WHERE i.user_id = $1 ORDER BY i.purchased_at DESC LIMIT 100`, [request.user.id]),
       pool.query(`SELECT id, title, message, link, read_at, created_at FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 5`, [request.user.id]),
       pool.query(`SELECT rc.code, (SELECT count(*)::int FROM referrals r WHERE r.referrer_id = $1 AND r.level = 1) AS direct_referrals FROM referral_codes rc WHERE rc.user_id = $1`, [request.user.id]),
       pool.query(`SELECT id, type, amount_xof, balance_bucket, status, reference, created_at FROM transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 6`, [request.user.id])

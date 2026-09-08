@@ -9,3 +9,8 @@ test('investment flow has mandatory idempotency and schedules the first gain aft
   assert.match(source, /\$4::int \* interval/);
   assert.match(source, /generate_series\(1, \$3::int\)/);
 });
+
+test('client investment payload includes the product validity duration', async () => {
+  const source = await readFile(new URL('../apps/api/src/modules/client/routes.js', import.meta.url), 'utf8');
+  assert.match(source, /i\.duration_days/);
+});
