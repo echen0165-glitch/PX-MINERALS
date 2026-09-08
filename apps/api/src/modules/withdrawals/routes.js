@@ -29,6 +29,8 @@ withdrawalRouter.post('/', async (request, response, next) => {
     if (previous.rowCount) { await client.query('COMMIT'); return response.json({ withdrawalId: previous.rows[0].id, status: previous.rows[0].status, idempotent: true }); }
     const deposited = await client.query("SELECT 1 FROM deposits WHERE user_id = $1 AND status = 'approved' LIMIT 1", [request.user.id]);
     if (!deposited.rowCount) { await client.query('ROLLBACK'); return response.status(422).json({ error: { code: 'VALIDATED_DEPOSIT_REQUIRED', message: 'Au moins un dépôt validé est requis avant un retrait.' } }); }
+    const invested = await client.query("SELECT 1 FROM investments WHERE user_id = $1 AND status IN ('active', 'completed') LIMIT 1", [request.user.id]);
+    if (!invested.rowCount) { await client.query('ROLLBACK'); return response.status(422).json({ error: { code: 'INVESTMENT_REQUIRED', message: 'Vous devez d’abord acheter une offre d’investissement avant de demander un retrait.' } }); }
     const today = await client.query("SELECT 1 FROM withdrawals WHERE user_id = $1 AND requested_at >= date_trunc('day', now()) LIMIT 1", [request.user.id]);
     if (today.rowCount) { await client.query('ROLLBACK'); return response.status(429).json({ error: { code: 'DAILY_LIMIT_REACHED', message: 'Un seul retrait est autorisé par jour.' } }); }
     const wallet = await client.query('SELECT available_balance, signup_bonus_balance FROM wallets WHERE user_id = $1 FOR UPDATE', [request.user.id]);

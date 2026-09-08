@@ -64,6 +64,7 @@ investmentRouter.post('/', async (request, response, next) => {
     await client.query('ROLLBACK');
     if (error.message === 'INSUFFICIENT_FUNDS') return response.status(422).json({ error: { code: 'INSUFFICIENT_FUNDS', message: 'Fonds insuffisants. Effectuez un dépôt pour continuer.' } });
     if (error.message === 'FUNDS_FROZEN') return response.status(423).json({ error: { code: 'FUNDS_FROZEN', message: 'Vos fonds sont temporairement gelés.' } });
+    if (['WALLET_NOT_FOUND', 'INVALID_WALLET_AMOUNT', 'INVALID_WALLET_DELTAS'].includes(error.message)) return response.status(422).json({ error: { code: error.message, message: 'Votre portefeuille doit être réinitialisé avant cet achat. Rechargez la page puis réessayez.' } });
     return next(error);
   } finally { client.release(); }
 });
