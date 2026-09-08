@@ -57,3 +57,11 @@ document.addEventListener('submit', async (event) => {
     event.target.reset();
   } catch (error) { alert(error.message); }
 }, true);
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-withdrawal][data-action="complete"]');
+  if (!button) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (!confirm('Confirmer que le retrait a été payé manuellement sur Wave ?')) return;
+  try { await api(`/api/admin/withdrawals/${button.dataset.withdrawal}/complete`, { method: 'POST', body: JSON.stringify({}) }); alert('Retrait marqué comme payé.'); load(); } catch (error) { alert(error.message); }
+}, true);
