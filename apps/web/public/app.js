@@ -89,7 +89,7 @@ function renderWallet(data) {
 
 function renderOffers() {
   const visible = offers.filter((offer) => offer.term === activeTerm);
-  $('#offers-list').innerHTML = visible.map((offer) => `<article class="offer-card"><span class="ore">◇</span><h3>${escape(offer.mineral_name)}</h3><p>${offer.term === 'short' ? 'Formule court terme' : 'Formule long terme'}</p><strong>${formatMoney(offer.price_xof)}</strong><div class="offer-meta"><span>${offer.duration_days} jours</span><span>${formatMoney(offer.daily_gain_xof)}/jour</span></div><button data-offer="${offer.id}">Choisir cette offre</button></article>`).join('');
+  $('#offers-list').innerHTML = visible.map((offer) => `<article class="offer-card offer-card-mineral"><div class="offer-card-head"><span class="ore mineral-orbit">◇</span><span class="offer-status"><i></i> Prêt à travailler</span></div><h3>${escape(offer.mineral_name)}</h3><p>${offer.term === 'short' ? 'Formule court terme' : 'Formule long terme'}</p><strong>${formatMoney(offer.price_xof)}</strong><div class="offer-meta"><span>${offer.duration_days} jours</span><span>${formatMoney(offer.daily_gain_xof)}/jour</span></div><div class="offer-workline"><span class="work-pulse"></span> Production quotidienne estimée</div><button data-offer="${offer.id}">Activer cet investissement <b>→</b></button></article>`).join('');
   document.querySelectorAll('[data-offer]').forEach((button) => button.addEventListener('click', () => buyOffer(button.dataset.offer)));
 }
 
