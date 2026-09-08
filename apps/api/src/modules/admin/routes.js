@@ -10,6 +10,49 @@ export const adminRouter = Router();
 adminRouter.use(requireAuthenticatedUser, (request, response, next) => request.user.role !== 'admin' ? response.status(403).json({ error: { code: 'ADMIN_ONLY', message: 'Accès administrateur requis.' } }) : !request.user.second_factor_verified_at ? response.status(403).json({ error: { code: 'ADMIN_2FA_REQUIRED', message: 'Double authentification administrateur requise.' } }) : next());
 async function audit(client, adminId, actionType, targetUserId, operationReference, result, justification = null) { await client.query('INSERT INTO admin_actions (admin_id, target_user_id, action_type, justification, operation_reference, result) VALUES ($1,$2,$3,$4,$5,$6)', [adminId, targetUserId, actionType, justification, operationReference, result]); }
 
+// The wallet credit is the essential part of an approval.  Referral rewards,
+// notifications and audit logging must never undo a valid client credit.
+adminRouter.post('/deposits/:id/approve', async (request, response, next) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const deposit = await client.query('SELECT * FROM deposits WHERE id=$1 FOR UPDATE', [request.params.id]);
+    if (!deposit.rowCount || deposit.rows[0].status !== 'pending') {
+      await client.query('ROLLBACK');
+      return response.status(409).json({ error: { code: 'DEPOSIT_NOT_PENDING', message: 'Dépôt déjà traité ou introuvable.' } });
+    }
+    const currentDeposit = deposit.rows[0];
+    await client.query("UPDATE deposits SET status='approved', reviewed_at=now(), reviewed_by=$1 WHERE id=$2", [request.user.id, request.params.id]);
+    await applyWalletMutation(client, {
+      userId: currentDeposit.user_id,
+      type: 'deposit',
+      bucket: 'available',
+      amountXof: Number(currentDeposit.amount_xof),
+      reference: `DEP-${request.params.id}`,
+      reason: 'Dépôt Wave validé par administration',
+      metadata: { depositId: request.params.id }
+    });
+
+    await client.query('SAVEPOINT deposit_optional_steps');
+    try {
+      await grantFirstDepositCommissions(client, request.params.id);
+      await notify(client, { userId: currentDeposit.user_id, title: 'Dépôt validé', message: `Votre dépôt de ${currentDeposit.amount_xof} FCFA a été crédité.`, link: '#wallet' });
+      await audit(client, request.user.id, 'deposit_approved', currentDeposit.user_id, request.params.id, 'completed', request.body?.justification || 'Validation directe depuis l’administration.');
+      await client.query('RELEASE SAVEPOINT deposit_optional_steps');
+    } catch (optionalError) {
+      await client.query('ROLLBACK TO SAVEPOINT deposit_optional_steps');
+      console.warn('PX_MINERALS_DEPOSIT_OPTIONAL_STEPS_FAILED', optionalError.message);
+    }
+    await client.query('COMMIT');
+    return response.json({ message: 'Dépôt validé et crédité.' });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    return next(error);
+  } finally {
+    client.release();
+  }
+});
+
 adminRouter.get('/dashboard', async (request, response, next) => { try {
   const [users, deposits, withdrawals, investments] = await Promise.all([
     pool.query("SELECT count(*)::int AS total, count(*) FILTER (WHERE status = 'active')::int AS active, count(*) FILTER (WHERE status IN ('suspended','blocked'))::int AS restricted FROM users WHERE role = 'client'"),
