@@ -39,10 +39,10 @@ investmentRouter.post('/', async (request, response, next) => {
     if (offer.rowCount !== 1) { await client.query('ROLLBACK'); return response.status(404).json({ error: { code: 'OFFER_NOT_FOUND', message: 'Offre indisponible.' } }); }
     const row = offer.rows[0];
     await client.query('INSERT INTO wallets (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [request.user.id]);
-    const wallet = await client.query('SELECT available_balance, bonus_balance, signup_bonus_balance FROM wallets WHERE user_id = $1 FOR UPDATE', [request.user.id]);
+    const wallet = await client.query('SELECT COALESCE(available_balance,0) AS available_balance, COALESCE(bonus_balance,0) AS bonus_balance, COALESCE(signup_bonus_balance,0) AS signup_bonus_balance FROM wallets WHERE user_id = $1 FOR UPDATE', [request.user.id]);
     if (!wallet.rowCount || Number(wallet.rows[0].available_balance) + Number(wallet.rows[0].bonus_balance) < Number(row.price_xof)) { await client.query('ROLLBACK'); return response.status(422).json({ error: { code: 'INSUFFICIENT_FUNDS', message: 'Fonds insuffisants. Effectuez un dépôt pour continuer.' } }); }
-    const signupBonusBalance = Number(wallet.rows[0].signup_bonus_balance);
-    const giftBonusBalance = Number(wallet.rows[0].bonus_balance) - signupBonusBalance;
+    const signupBonusBalance = Math.max(0, Math.min(Number(wallet.rows[0].signup_bonus_balance), Number(wallet.rows[0].bonus_balance)));
+    const giftBonusBalance = Math.max(0, Number(wallet.rows[0].bonus_balance) - signupBonusBalance);
     const giftBonusUsed = Math.min(giftBonusBalance, Number(row.price_xof));
     const signupBonusUsed = Math.min(signupBonusBalance, Number(row.price_xof) - giftBonusUsed);
     const bonusUsed = giftBonusUsed + signupBonusUsed;

@@ -9,6 +9,7 @@ import { notify } from '../notifications/service.js';
 export const adminRouter = Router();
 adminRouter.use(requireAuthenticatedUser, (request, response, next) => request.user.role !== 'admin' ? response.status(403).json({ error: { code: 'ADMIN_ONLY', message: 'Accès administrateur requis.' } }) : !request.user.second_factor_verified_at ? response.status(403).json({ error: { code: 'ADMIN_2FA_REQUIRED', message: 'Double authentification administrateur requise.' } }) : next());
 async function audit(client, adminId, actionType, targetUserId, operationReference, result, justification = null) { await client.query('INSERT INTO admin_actions (admin_id, target_user_id, action_type, justification, operation_reference, result) VALUES ($1,$2,$3,$4,$5,$6)', [adminId, targetUserId, actionType, justification, operationReference, result]); }
+async function safeNotify(client, payload) { try { await notify(client, payload); } catch (error) { console.warn('PX_MINERALS_ADMIN_NOTIFICATION_FAILED', error.message); } }
 
 // The wallet credit is the essential part of an approval.  Referral rewards,
 // notifications and audit logging must never undo a valid client credit.
