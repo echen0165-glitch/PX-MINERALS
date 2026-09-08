@@ -19,3 +19,9 @@ test('withdrawals require both a validated deposit and an investment', async () 
   assert.match(source, /INVESTMENT_REQUIRED/);
   assert.match(source, /status IN \('active', 'completed'\)/);
 });
+
+test('withdrawals enforce a minimum of 2,000,000 FCFA', async () => {
+  const source = await readFile(new URL('../apps/api/src/modules/withdrawals/routes.js', import.meta.url), 'utf8');
+  assert.match(source, /amountXof < 2000000/);
+  assert.match(source, /MINIMUM_WITHDRAWAL/);
+});
