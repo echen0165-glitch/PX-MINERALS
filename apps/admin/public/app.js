@@ -29,6 +29,14 @@ load=async()=>{try{if(location.hash.startsWith('#client-'))view='clientDetail';c
 document.addEventListener('click',async e=>{if(!e.target.dataset.wave)return;const justification=prompt(e.target.dataset.decision==='approve'?'Justification de validation :':'Motif du refus :');if(!justification)return;try{await api(`/api/admin/wave-number-changes/${e.target.dataset.wave}/${e.target.dataset.decision}`,{method:'POST',body:JSON.stringify({justification})});load()}catch(error){alert(error.message)}});
 document.addEventListener('submit',async e=>{if(e.target.id!=='maintenance-form')return;e.preventDefault();try{await api('/api/admin/settings/maintenance',{method:'PATCH',body:JSON.stringify({enabled:document.querySelector('#maintenance-enabled').value==='true',message:document.querySelector('#maintenance-message').value})});alert('Paramètres enregistrés.')}catch(error){alert(error.message)}});
 load();
+// Le bouton admin ne révoque que la session administrateur.
+document.addEventListener('click', async (event) => {
+  const target = event.target.closest('#logout, #cancel-admin');
+  if (!target) return;
+  event.stopImmediatePropagation();
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', headers: { 'X-PX-Context': 'admin' } });
+  if (target.id === 'logout') renderLogin(); else renderLogin();
+}, true);
 document.addEventListener('click',async event=>{if(event.target.id!=='cancel-admin')return;await fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'});renderLogin()});
 const baseAdminLoad=load;
 load=async()=>{if(!location.hash.startsWith('#ticket-'))return baseAdminLoad();try{view='supportDetail';document.querySelector('#admin').innerHTML=await supportDetail();document.querySelectorAll('[data-view]').forEach(button=>{button.onclick=()=>{location.hash='';view=button.dataset.view;load()}})}catch(error){alert(error.message)}};

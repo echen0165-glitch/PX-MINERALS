@@ -202,6 +202,12 @@ window.addEventListener('hashchange', () => showView(location.hash.slice(1) || '
 $('#menu-button').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
 $('#account-button').addEventListener('click', () => { const menu = $('.account-menu'); menu.classList.toggle('open'); $('#account-button').setAttribute('aria-expanded', String(menu.classList.contains('open'))); });
 $('#logout-button').addEventListener('click', async () => { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); window.location.replace('/app/login.html'); });
+// Indique explicitement le contexte afin de ne révoquer que la session client.
+document.querySelector('#logout-button').addEventListener('click', async (event) => {
+  event.stopImmediatePropagation();
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', headers: { 'X-PX-Context': 'client' } });
+  window.location.replace('/app/login.html');
+}, true);
 $('#copy-referral').addEventListener('click', async () => { if (!dashboard?.referral?.code) return; await copyText(`${window.location.origin}/app/register.html?ref=${encodeURIComponent(dashboard.referral.code)}`); $('#copy-referral').textContent = 'Lien copié ✓'; setTimeout(() => { $('#copy-referral').textContent = 'Copier le lien'; }, 1800); });
 document.querySelectorAll('[data-term]').forEach((button) => button.addEventListener('click', () => { activeTerm = button.dataset.term; document.querySelectorAll('[data-term]').forEach((tab) => tab.classList.toggle('active', tab === button)); renderOffers(); }));
 $('#withdrawal-amount').addEventListener('input', renderWithdrawalQuote); $('#withdrawal-submit').addEventListener('click', createWithdrawal);

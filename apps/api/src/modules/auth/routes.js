@@ -6,7 +6,7 @@ import { env } from '../../config/env.js';
 import { pool } from '../../config/database.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from './mailer.js';
 import { generateNumericCode, hashSecret, passwordIsValid, verifySecret } from './passwords.js';
-import { clearSessionCookie, createSession, requireAuthenticatedUser, revokeSession, setSessionCookie } from './session.js';
+import { clearSessionCookie, createSession, requireAuthenticatedUser, revokeSession, sessionContext, sessionCookieName, setSessionCookie } from './session.js';
 import { markSecondFactorVerified } from './session.js';
 import * as OTPAuth from 'otpauth';
 import { applyWalletMutation } from '../wallet/ledger.js';
@@ -152,20 +152,21 @@ authRouter.post('/resend-verification', sensitiveLimit, async (request, response
 authRouter.post('/login', sensitiveLimit, async (request, response, next) => {
   const input = parse(z.object({ email: z.string().email(), password: z.string().min(1) }), request.body, response); if (!input) return;
   try {
-    const found = await pool.query('SELECT id, password_hash, status FROM users WHERE email = lower($1)', [input.email]);
+    const found = await pool.query('SELECT id, password_hash, status, role FROM users WHERE email = lower($1)', [input.email]);
     if (found.rowCount !== 1 || !(await verifySecret(input.password, found.rows[0].password_hash))) return response.status(401).json({ error: { code: 'INVALID_CREDENTIALS', message: 'E-mail ou mot de passe incorrect.' } });
     if (found.rows[0].status !== 'active') return response.status(403).json({ error: { code: 'ACCOUNT_INACTIVE', message: 'Veuillez vérifier votre e-mail ou contacter le support.' } });
-    const token = await createSession(found.rows[0].id, request); setSessionCookie(response, token);
+    const context = found.rows[0].role === 'admin' ? 'admin' : 'client';
+    const token = await createSession(found.rows[0].id, request); setSessionCookie(response, token, context);
     await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [found.rows[0].id]);
     return response.json({ message: 'Connexion réussie.' });
   } catch (error) { return next(error); }
 });
 
-authRouter.post('/logout', async (request, response, next) => { try { await revokeSession(request.cookies.px_session); clearSessionCookie(response); return response.status(204).send(); } catch (error) { return next(error); } });
+authRouter.post('/logout', async (request, response, next) => { try { const context = sessionContext(request); await revokeSession(request.cookies[sessionCookieName(context)]); clearSessionCookie(response, context); return response.status(204).send(); } catch (error) { return next(error); } });
 authRouter.post('/admin/verify-2fa', sensitiveLimit, requireAuthenticatedUser, async (request, response, next) => {
   const code = z.object({ code: z.string().regex(/^\d{6}$/) }).safeParse(request.body); if (!code.success) return response.status(422).json({ error: { code: 'INVALID_2FA_CODE', message: 'Code invalide.' } });
   if (request.user.role !== 'admin') return response.status(403).json({ error: { code: 'ADMIN_ONLY', message: 'Accès administrateur requis.' } });
-  try { const credential = await pool.query('SELECT secret FROM admin_totp_credentials WHERE user_id = $1', [request.user.id]); if (!credential.rowCount) return response.status(403).json({ error: { code: '2FA_NOT_CONFIGURED', message: '2FA administrateur non configuré.' } }); const totp = new OTPAuth.TOTP({ issuer: 'PX MINERALS', algorithm: 'SHA1', digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(credential.rows[0].secret) }); if (totp.validate({ token: code.data.code, window: 1 }) === null) return response.status(401).json({ error: { code: 'INVALID_2FA_CODE', message: 'Code 2FA incorrect.' } }); await markSecondFactorVerified(request.cookies.px_session); await pool.query('INSERT INTO security_logs (user_id,event_type,result,ip_address,user_agent) VALUES ($1,$2,$3,$4,$5)', [request.user.id,'admin_2fa_verified','success',request.ip,request.get('user-agent')]); return response.status(204).send(); } catch (error) { return next(error); }
+  try { const credential = await pool.query('SELECT secret FROM admin_totp_credentials WHERE user_id = $1', [request.user.id]); if (!credential.rowCount) return response.status(403).json({ error: { code: '2FA_NOT_CONFIGURED', message: '2FA administrateur non configuré.' } }); const totp = new OTPAuth.TOTP({ issuer: 'PX MINERALS', algorithm: 'SHA1', digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(credential.rows[0].secret) }); if (totp.validate({ token: code.data.code, window: 1 }) === null) return response.status(401).json({ error: { code: 'INVALID_2FA_CODE', message: 'Code 2FA incorrect.' } }); await markSecondFactorVerified(request.cookies[sessionCookieName('admin')]); await pool.query('INSERT INTO security_logs (user_id,event_type,result,ip_address,user_agent) VALUES ($1,$2,$3,$4,$5)', [request.user.id,'admin_2fa_verified','success',request.ip,request.get('user-agent')]); return response.status(204).send(); } catch (error) { return next(error); }
 });
 authRouter.get('/me', requireAuthenticatedUser, (request, response) => response.json({ user: request.user }));
 

@@ -3,7 +3,8 @@ import { env } from '../../config/env.js';
 import { pool } from '../../config/database.js';
 import { generateSessionToken } from './passwords.js';
 
-const SESSION_COOKIE = 'px_session';
+const CLIENT_SESSION_COOKIE = 'px_client_session';
+const ADMIN_SESSION_COOKIE = 'px_admin_session';
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 14;
 const IDLE_TIMEOUT_MINUTES = 24 * 60;
 
@@ -20,8 +21,16 @@ export async function createSession(userId, request) {
 }
 export async function markSecondFactorVerified(token) { if (token) await pool.query('UPDATE sessions SET second_factor_verified_at = now() WHERE token_hash = $1', [tokenHash(token)]); }
 
-export function setSessionCookie(response, token) {
-  response.cookie(SESSION_COOKIE, token, {
+export function sessionContext(request) {
+  const explicit = request.get('x-px-context');
+  if (explicit === 'admin' || explicit === 'client') return explicit;
+  return request.baseUrl === '/api/admin'
+    || request.originalUrl?.startsWith('/api/admin')
+    || request.originalUrl?.startsWith('/api/auth/admin/') ? 'admin' : 'client';
+}
+export function sessionCookieName(context = 'client') { return context === 'admin' ? ADMIN_SESSION_COOKIE : CLIENT_SESSION_COOKIE; }
+export function setSessionCookie(response, token, context = 'client') {
+  response.cookie(sessionCookieName(context), token, {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -30,13 +39,14 @@ export function setSessionCookie(response, token) {
   });
 }
 
-export function clearSessionCookie(response) {
-  response.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: 'lax', path: '/' });
+export function clearSessionCookie(response, context = 'client') {
+  response.clearCookie(sessionCookieName(context), { httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: 'lax', path: '/' });
 }
 
 export async function requireAuthenticatedUser(request, response, next) {
   try {
-    const token = request.cookies[SESSION_COOKIE];
+    const context = sessionContext(request);
+    const token = request.cookies[sessionCookieName(context)];
     if (!token) {
       console.info('PX_MINERALS_SESSION_REJECTED reason=missing_cookie');
       return response.status(401).json({ error: { code: 'UNAUTHENTICATED', message: 'Authentification requise.' } });
@@ -55,7 +65,7 @@ export async function requireAuthenticatedUser(request, response, next) {
     request.user = result.rows[0];
     await pool.query('UPDATE sessions SET last_seen_at = now() WHERE token_hash = $1', [tokenHash(token)]);
     // Une activité légitime prolonge la durée du cookie : le client ne perd pas sa session pendant un simple rafraîchissement.
-    setSessionCookie(response, token);
+    setSessionCookie(response, token, context);
     return next();
   } catch (error) {
     return next(error);
