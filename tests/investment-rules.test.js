@@ -6,5 +6,6 @@ test('investment flow has mandatory idempotency and schedules the first gain aft
   const source = await readFile(new URL('../apps/api/src/modules/investments/routes.js', import.meta.url), 'utf8');
   assert.match(source, /IDEMPOTENCY_KEY_REQUIRED/);
   assert.match(source, /now\(\) \+ interval '24 hours'/);
-  assert.match(source, /generate_series\(1, \$3\)/);
+  assert.match(source, /\$4::int \* interval/);
+  assert.match(source, /generate_series\(1, \$3::int\)/);
 });

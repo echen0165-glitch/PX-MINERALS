@@ -48,11 +48,11 @@ investmentRouter.post('/', async (request, response, next) => {
     const bonusUsed = giftBonusUsed + signupBonusUsed;
     const availableUsed = Number(row.price_xof) - bonusUsed;
     const investment = await client.query(`INSERT INTO investments (user_id, offer_id, price_xof, duration_days, daily_gain_xof, ends_at, next_gain_at)
-      VALUES ($1,$2,$3,$4,$5,now() + ($4 * interval '1 day'),now() + interval '24 hours') RETURNING id, ends_at, next_gain_at`, [request.user.id, row.id, row.price_xof, row.duration_days, row.daily_gain_xof]);
+      VALUES ($1,$2,$3,$4::int,$5,now() + ($4::int * interval '1 day'),now() + interval '24 hours') RETURNING id, ends_at, next_gain_at`, [request.user.id, row.id, row.price_xof, row.duration_days, row.daily_gain_xof]);
     const investmentId = investment.rows[0].id;
     await applyWalletMutation(client, { userId: request.user.id, type: 'investment', bucket: 'available', amountXof: -Number(row.price_xof), deltas: { available: -availableUsed, bonus: -bonusUsed, signup_bonus: -signupBonusUsed }, reference: `INV-${investmentId}`, idempotencyKey: rawKey, reason: `Investment ${row.mineral_name} ${row.term}`, metadata: { investmentId, offerId: row.id, bonusUsed, giftBonusUsed, signupBonusUsed } });
     await client.query(`INSERT INTO investment_gain_events (investment_id, scheduled_at, amount_xof)
-      SELECT $1, now() + (item * interval '1 day'), $2 FROM generate_series(1, $3) item`, [investmentId, row.daily_gain_xof, row.duration_days]);
+      SELECT $1, now() + (item * interval '1 day'), $2 FROM generate_series(1, $3::int) item`, [investmentId, row.daily_gain_xof, row.duration_days]);
     try {
       await notify(client, { userId: request.user.id, title: 'Investissement activé', message: `${row.mineral_name} est maintenant actif. Votre premier gain sera crédité dans 24 heures.`, link: '#investments' });
     } catch (notificationError) {
