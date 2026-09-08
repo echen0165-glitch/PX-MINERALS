@@ -7,3 +7,8 @@ test('wallet ledger migration makes financial entries immutable', async () => {
   assert.match(migration, /wallet_ledger_entries/);
   assert.match(migration, /wallet ledger entries are immutable/);
 });
+
+test('wallet balance checks convert PostgreSQL numeric strings before arithmetic', async () => {
+  const source = await readFile(new URL('../apps/api/src/modules/wallet/ledger.js', import.meta.url), 'utf8');
+  assert.match(source, /Number\(wallet\.rows\[0\]\[columns\[name\]\]\) \+ delta\[name\]/);
+});

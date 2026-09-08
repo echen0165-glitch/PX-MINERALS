@@ -17,7 +17,7 @@ export async function applyWalletMutation(client, { userId, type, bucket = 'avai
   if (wallet.rowCount !== 1) throw new Error('WALLET_NOT_FOUND');
   const delta = { available: 0, pending: 0, bonus: 0, signup_bonus: 0, referral: 0, ...(deltas ?? { [bucket]: amountXof }) };
   if (!Object.entries(delta).every(([name, value]) => buckets.has(name) && Number.isSafeInteger(value))) throw new Error('INVALID_WALLET_DELTAS');
-  if (Object.keys(delta).some((name) => wallet.rows[0][columns[name]] + delta[name] < 0)) throw new Error('INSUFFICIENT_FUNDS');
+  if (Object.keys(delta).some((name) => Number(wallet.rows[0][columns[name]]) + delta[name] < 0)) throw new Error('INSUFFICIENT_FUNDS');
   if (wallet.rows[0].funds_frozen && Object.values(delta).some((value) => value < 0)) throw new Error('FUNDS_FROZEN');
   const transaction = await client.query(
     `INSERT INTO transactions (user_id, type, amount_xof, balance_bucket, status, reference, idempotency_key, metadata)
