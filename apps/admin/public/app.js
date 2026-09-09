@@ -46,6 +46,8 @@ document.addEventListener('submit',async event=>{if(event.target.id!=='support-r
 let adminRefreshInFlight = false;
 document.addEventListener('click', async (event) => { const button = event.target.closest('[data-deposit][data-action="approve"]'); if (!button) return; event.preventDefault(); event.stopImmediatePropagation(); if (!confirm('Valider ce dépôt et créditer automatiquement le portefeuille du client ?')) return; try { await api(`/api/admin/deposits/${button.dataset.deposit}/approve`, { method: 'POST', body: JSON.stringify({ justification: 'Validation directe depuis l’administration.' }) }); alert('Dépôt validé : le portefeuille du client a été crédité.'); load(); } catch (error) { alert(error.message); } }, true);
 setInterval(async () => { const liveViews = ['dashboard', 'deposits', 'withdrawals', 'clients']; if (adminRefreshInFlight || !document.querySelector('.shell') || !liveViews.includes(view) || document.querySelector('input:focus, textarea:focus, select:focus')) return; adminRefreshInFlight = true; try { await load(); } finally { adminRefreshInFlight = false; } }, 15000);
+// Actualise aussi la conversation ouverte pour afficher rapidement les nouveaux messages client.
+setInterval(() => { if (location.hash.startsWith('#ticket-') && !document.querySelector('textarea:focus')) load(); }, 12000);
 document.addEventListener('submit', async (event) => {
   if (event.target.id !== 'notification-form') return;
   event.preventDefault();
