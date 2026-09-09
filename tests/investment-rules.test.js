@@ -15,6 +15,14 @@ test('client investment payload includes the product validity duration', async (
   assert.match(source, /i\.duration_days/);
 });
 
+test('legacy active investments receive one gain event per product day', async () => {
+  const migration = await readFile(new URL('../database/migrations/014_backfill_investment_gain_events.sql', import.meta.url), 'utf8');
+  assert.match(migration, /FROM investments i/);
+  assert.match(migration, /generate_series\(1, legacy\.duration_days\)/);
+  assert.match(migration, /NOT EXISTS \(\s*SELECT 1 FROM investment_gain_events/);
+  assert.match(migration, /ON CONFLICT \(investment_id, scheduled_at\) DO NOTHING/);
+});
+
 test('referral commissions require a confirmed first validated deposit', async () => {
   const source = await readFile(new URL('../apps/api/src/modules/referrals/service.js', import.meta.url), 'utf8');
   const migration = await readFile(new URL('../database/migrations/013_referral_deposit_confirmation.sql', import.meta.url), 'utf8');
