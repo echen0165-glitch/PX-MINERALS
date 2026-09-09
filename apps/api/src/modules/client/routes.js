@@ -10,7 +10,12 @@ clientRouter.use(requireAuthenticatedUser);
 clientRouter.get('/dashboard', async (request, response, next) => {
   try {
     // Filet de sécurité : une visite du compte régularise immédiatement tout gain arrivé à échéance.
-    await settleDueGains();
+    try {
+      await settleDueGains();
+    } catch (gainError) {
+      // Une indisponibilité momentanée du job ne doit jamais empêcher le client d’ouvrir son compte.
+      console.warn('PX_MINERALS_GAIN_SETTLEMENT_DEFERRED', gainError.message);
+    }
     const [profile, wallet, investments, notifications, referral, recent] = await Promise.all([
       pool.query(`SELECT first_name, last_name, username, client_code, avatar_key, created_at FROM users WHERE id = $1`, [request.user.id]),
       pool.query(`SELECT available_balance, pending_balance, bonus_balance, signup_bonus_balance, referral_balance, total_gains_received FROM wallets WHERE user_id = $1`, [request.user.id]),

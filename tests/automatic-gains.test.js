@@ -9,4 +9,5 @@ test('gains job is a real Netlify scheduled function and dashboard has a safety 
   assert.match(scheduled, /export const handler/);
   assert.doesNotMatch(scheduled, /closeDatabase/);
   assert.match(client, /await settleDueGains\(\)/);
+  assert.match(client, /PX_MINERALS_GAIN_SETTLEMENT_DEFERRED/);
 });
