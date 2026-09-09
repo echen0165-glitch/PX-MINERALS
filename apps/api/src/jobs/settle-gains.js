@@ -8,6 +8,23 @@ export async function settleDueGains() {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // Older investments may predate the daily-event schedule. Rebuild it
+      // lazily and idempotently so every active product is covered, even if
+      // the database migration has not run yet.
+      await client.query(`WITH legacy AS (
+          SELECT i.id, i.purchased_at, i.duration_days, i.daily_gain_xof,
+            LEAST(i.duration_days, FLOOR(GREATEST(i.gains_received_xof, 0)::numeric /
+              NULLIF(i.daily_gain_xof, 0))::int) AS already_credited
+          FROM investments i
+          WHERE i.status = 'active'
+            AND NOT EXISTS (SELECT 1 FROM investment_gain_events ge WHERE ge.investment_id = i.id)
+        )
+        INSERT INTO investment_gain_events (investment_id, scheduled_at, amount_xof, status, credited_at)
+        SELECT legacy.id, legacy.purchased_at + (series.day_number * interval '1 day'), legacy.daily_gain_xof,
+          CASE WHEN series.day_number <= legacy.already_credited THEN 'completed'::operation_status ELSE 'pending'::operation_status END,
+          CASE WHEN series.day_number <= legacy.already_credited THEN legacy.purchased_at + (series.day_number * interval '1 day') ELSE NULL END
+        FROM legacy CROSS JOIN LATERAL generate_series(1, legacy.duration_days) AS series(day_number)
+        ON CONFLICT (investment_id, scheduled_at) DO NOTHING`);
       const due = await client.query(`SELECT ge.id, ge.investment_id, ge.amount_xof, ge.scheduled_at, i.user_id
         FROM investment_gain_events ge JOIN investments i ON i.id = ge.investment_id
         WHERE ge.status = 'pending' AND ge.scheduled_at <= now() AND i.status = 'active'
