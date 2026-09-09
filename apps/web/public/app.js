@@ -63,7 +63,7 @@ function renderDashboard(data) {
   $('#investment-list').innerHTML = investmentMarkup;
   $('#my-investments-list').innerHTML = investments.length ? investments.map((item) => mineralCard(item, investmentProgress(item))).join('') : `<div class="empty-mini">Aucun investissement pour le moment.</div>`;
   $('#activity-list').innerHTML = recentTransactions.length ? recentTransactions.map((item) => `<article class="activity-item"><span class="activity-icon">${({ deposit: '↓', investment: '◇', gain: '↗', referral_commission: '♧', bonus: '✦', withdrawal: '↑', refund: '↩', correction: '•' })[item.type] ?? '•'}</span><div><strong>${escape(item.type.replaceAll('_', ' '))}</strong><p>${formatDate(item.created_at)}</p></div><div><strong>${formatMoney(item.amount_xof)}</strong><p>${escape(item.status)}</p></div></article>`).join('') : `<div class="empty-mini">Aucune opération récente.</div>`;
-  $('#referral-copy').textContent = referral ? `Votre code ${referral.code} · ${referral.direct_referrals} filleul${referral.direct_referrals > 1 ? 's' : ''} direct${referral.direct_referrals > 1 ? 's' : ''}.` : 'Votre code de parrainage sera disponible après activation.';
+  $('#referral-copy').textContent = referral ? `Votre code ${referral.code} · commission seulement après le premier dépôt validé de votre filleul.` : 'Votre code de parrainage sera disponible après activation.';
 }
 
 function renderAccount(data) {
@@ -164,7 +164,7 @@ function renderReferral(data) {
   referralData = data; $('#referral-code').textContent = data.code ?? '—'; $('#referral-minimum').textContent = `Minimum de retrait des commissions : ${formatMoney(data.minimumWithdrawalXof)}.`;
   $('#referral-link').textContent = data.code ? `${window.location.origin}/app/register.html?ref=${encodeURIComponent(data.code)}` : 'Votre lien sera disponible après activation.';
   const byLevel = Object.fromEntries(data.stats.map((item) => [item.level, item.total]));
-  $('#referral-stats').innerHTML = [1, 2, 3].map((level) => `<article><span>NIVEAU ${level}</span><strong>${byLevel[level] ?? 0}</strong><i>${({ 1: '30 % du premier dépôt', 2: '5 % du premier dépôt', 3: '4 % du premier dépôt' })[level]}</i></article>`).join('');
+  $('#referral-stats').innerHTML = [1, 2, 3].map((level) => `<article><span>NIVEAU ${level}</span><strong>${byLevel[level] ?? 0}</strong><i>${({ 1: '30 % après dépôt validé', 2: '5 % après dépôt validé', 3: '4 % après dépôt validé' })[level]}</i></article>`).join('');
   $('#commissions-list').innerHTML = data.commissions.length ? data.commissions.map((item) => `<article class="activity-item"><span class="activity-icon">♧</span><div><strong>Commission niveau ${item.level}</strong><p>${formatDate(item.created_at)}</p></div><div><strong>+${formatMoney(item.amount_xof)}</strong><p>${Number(item.rate_basis_points) / 100}%</p></div></article>`).join('') : '<div class="empty-mini">Aucune commission reçue pour le moment.</div>';
 }
 function renderNotifications(data) {
