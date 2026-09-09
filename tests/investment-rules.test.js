@@ -30,3 +30,11 @@ test('referral commissions require a confirmed first validated deposit', async (
   assert.match(source, /confirmed_at IS NOT NULL/);
   assert.match(migration, /ADD COLUMN IF NOT EXISTS confirmed_at/);
 });
+
+test('welcome bonus is credited to the principal balance', async () => {
+  const source = await readFile(new URL('../apps/api/src/modules/auth/routes.js', import.meta.url), 'utf8');
+  const migration = await readFile(new URL('../database/migrations/015_move_welcome_bonus_to_available.sql', import.meta.url), 'utf8');
+  assert.match(source, /deltas: \{ available: 1500 \}/);
+  assert.match(migration, /available_balance = available_balance \+ signup_bonus_balance/);
+  assert.match(migration, /signup_bonus_balance = 0/);
+});

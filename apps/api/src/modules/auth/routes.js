@@ -62,7 +62,7 @@ authRouter.post('/register', sensitiveLimit, async (request, response, next) => 
       [input.firstName, input.lastName, input.username, input.email, passwordHash, input.birthDate, input.waveNumber, `PX-${randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`, input.avatarKey ?? 'crystal']
     );
     await client.query('INSERT INTO wallets (user_id) VALUES ($1)', [user.rows[0].id]);
-    const bonusTransactionId = await applyWalletMutation(client, { userId: user.rows[0].id, type: 'bonus', bucket: 'signup_bonus', amountXof: 1500, deltas: { bonus: 1500, signup_bonus: 1500 }, reason: 'Bonus de bienvenue à l’inscription', metadata: { kind: 'signup_bonus' } });
+    const bonusTransactionId = await applyWalletMutation(client, { userId: user.rows[0].id, type: 'bonus', bucket: 'available', amountXof: 1500, deltas: { available: 1500 }, reason: 'Bonus de bienvenue à l’inscription', metadata: { kind: 'signup_bonus' } });
     await client.query('INSERT INTO signup_bonus_grants (user_id, amount_xof, transaction_id) VALUES ($1, 1500, $2)', [user.rows[0].id, bonusTransactionId]);
     if (referral) {
       const direct = referral.rows[0].user_id;
