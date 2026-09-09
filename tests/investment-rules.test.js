@@ -14,3 +14,11 @@ test('client investment payload includes the product validity duration', async (
   const source = await readFile(new URL('../apps/api/src/modules/client/routes.js', import.meta.url), 'utf8');
   assert.match(source, /i\.duration_days/);
 });
+
+test('referral commissions require a confirmed first validated deposit', async () => {
+  const source = await readFile(new URL('../apps/api/src/modules/referrals/service.js', import.meta.url), 'utf8');
+  const migration = await readFile(new URL('../database/migrations/013_referral_deposit_confirmation.sql', import.meta.url), 'utf8');
+  assert.match(source, /SET confirmed_at = now\(\)/);
+  assert.match(source, /confirmed_at IS NOT NULL/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS confirmed_at/);
+});

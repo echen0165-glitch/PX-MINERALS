@@ -9,7 +9,9 @@ export async function grantFirstDepositCommissions(client, depositId) {
   if (!deposit.rowCount || deposit.rows[0].status !== 'approved') return 0;
   const prior = await client.query("SELECT count(*)::int AS count FROM deposits WHERE user_id = $1 AND status = 'approved' AND id <> $2", [deposit.rows[0].user_id, depositId]);
   if (prior.rows[0].count > 0) return 0;
-  const referrals = await client.query('SELECT id, referrer_id, level FROM referrals WHERE referred_user_id = $1 ORDER BY level', [deposit.rows[0].user_id]);
+  // Le premier dépôt validé confirme officiellement le parrainage du filleul.
+  await client.query('UPDATE referrals SET confirmed_at = now() WHERE referred_user_id = $1 AND confirmed_at IS NULL', [deposit.rows[0].user_id]);
+  const referrals = await client.query('SELECT id, referrer_id, level FROM referrals WHERE referred_user_id = $1 AND confirmed_at IS NOT NULL ORDER BY level', [deposit.rows[0].user_id]);
   for (const referral of referrals.rows) {
     const rate = rates[referral.level];
     const amount = Math.floor(Number(deposit.rows[0].amount_xof) * rate / 10000);
