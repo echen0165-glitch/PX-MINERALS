@@ -2,12 +2,15 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../../config/database.js';
 import { requireAuthenticatedUser } from '../auth/session.js';
+import { settleDueGains } from '../../jobs/settle-gains.js';
 
 export const clientRouter = Router();
 clientRouter.use(requireAuthenticatedUser);
 
 clientRouter.get('/dashboard', async (request, response, next) => {
   try {
+    // Filet de sécurité : une visite du compte régularise immédiatement tout gain arrivé à échéance.
+    await settleDueGains();
     const [profile, wallet, investments, notifications, referral, recent] = await Promise.all([
       pool.query(`SELECT first_name, last_name, username, client_code, avatar_key, created_at FROM users WHERE id = $1`, [request.user.id]),
       pool.query(`SELECT available_balance, pending_balance, bonus_balance, signup_bonus_balance, referral_balance, total_gains_received FROM wallets WHERE user_id = $1`, [request.user.id]),
