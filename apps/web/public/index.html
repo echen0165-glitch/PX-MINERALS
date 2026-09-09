@@ -37,7 +37,7 @@
       </aside>
       <main class="main">
         <header class="topbar"><button id="menu-button" class="icon-button menu-button" aria-label="Ouvrir le menu">☰</button><div class="crumb"><span id="page-kicker">ESPACE CLIENT</span><h1 id="page-title">Bonjour</h1></div><div class="top-actions"><button class="icon-button" id="notifications-button" aria-label="Notifications">◉<em id="unread-count">0</em></button><div class="account-menu"><button class="user-chip" id="account-button" aria-expanded="false"><span class="avatar" id="header-avatar">PX</span><span id="header-username">Chargement</span><small>⌄</small></button><div class="account-popover" id="account-popover"><a href="#account">Mon compte</a><button id="logout-button">Se déconnecter</button></div></div></div></header>
-        <div id="loading" class="loading"><div></div><p>Préparation de votre espace sécurisé…</p></div>
+        <div id="loading" class="loading"><div class="loading-spinner"></div><p>Préparation de votre espace sécurisé…</p></div>
         <section id="dashboard-view" class="view hidden">
           <div class="welcome"><div><p class="eyebrow">TABLEAU DE BORD</p><h2>Votre activité, en un regard.</h2><p>Gérez vos avoirs et suivez vos investissements depuis un espace sécurisé.</p></div><div class="date-chip" id="today"></div></div>
           <div class="dashboard-grid">
@@ -65,5 +65,5 @@
       </main>
     </div>
     <script type="module" src="/app/app.js"></script>
-  </body>
+  <style>.loading>div:not(.loading-spinner){width:auto;height:auto;border:0;margin:0;animation:none}.loading .loading-spinner{width:34px;height:34px;border:3px solid #dbe9f8;border-top-color:#1762c6;border-radius:50%;margin:auto;animation:spin 1s linear infinite}</style></body>
 </html>
