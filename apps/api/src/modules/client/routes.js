@@ -11,7 +11,9 @@ clientRouter.get('/dashboard', async (request, response, next) => {
   try {
     // Filet de sécurité : une visite du compte régularise immédiatement tout gain arrivé à échéance.
     try {
-      await settleDueGains();
+      // Le compte connecté est régularisé directement : un éventuel dossier
+      // défaillant d’un autre client ne peut jamais bloquer ses gains.
+      await settleDueGains({ userId: request.user.id });
     } catch (gainError) {
       // Une indisponibilité momentanée du job ne doit jamais empêcher le client d’ouvrir son compte.
       console.warn('PX_MINERALS_GAIN_SETTLEMENT_DEFERRED', gainError.message);

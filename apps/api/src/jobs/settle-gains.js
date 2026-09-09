@@ -2,7 +2,7 @@ import { pool, closeDatabase } from '../config/database.js';
 import { applyWalletMutation } from '../modules/wallet/ledger.js';
 
 /** Credits each due gain once. Safe to run repeatedly or from multiple workers. */
-export async function settleDueGains() {
+export async function settleDueGains({ userId = null } = {}) {
   let settled = 0;
   while (true) {
     const client = await pool.connect();
@@ -28,7 +28,8 @@ export async function settleDueGains() {
       const due = await client.query(`SELECT ge.id, ge.investment_id, ge.amount_xof, ge.scheduled_at, i.user_id
         FROM investment_gain_events ge JOIN investments i ON i.id = ge.investment_id
         WHERE ge.status = 'pending' AND ge.scheduled_at <= now() AND i.status = 'active'
-        ORDER BY ge.scheduled_at ASC LIMIT 1 FOR UPDATE OF ge SKIP LOCKED`);
+          ${userId ? 'AND i.user_id = $1' : ''}
+        ORDER BY ge.scheduled_at ASC LIMIT 1 FOR UPDATE OF ge SKIP LOCKED`, userId ? [userId] : []);
       if (!due.rowCount) { await client.query('COMMIT'); return settled; }
       const gain = due.rows[0];
       await applyWalletMutation(client, { userId: gain.user_id, type: 'gain', bucket: 'available', amountXof: Number(gain.amount_xof), reference: `GAIN-${gain.id}`, idempotencyKey: gain.id, reason: 'Gain d’investissement', metadata: { investmentId: gain.investment_id, gainEventId: gain.id } });
