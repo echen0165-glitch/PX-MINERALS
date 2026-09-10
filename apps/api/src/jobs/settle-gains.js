@@ -11,6 +11,8 @@ export async function settleDueGains({ userId = null } = {}) {
       // Reconcile every active product against its full daily schedule. This
       // restores a missing day even when an older deployment created only a
       // partial schedule, and stays safe because each date is unique.
+      await client.query('SAVEPOINT gain_schedule_reconciliation');
+      try {
       await client.query(`WITH scheduled AS (
           SELECT i.id, i.purchased_at, i.duration_days, i.daily_gain_xof,
             LEAST(i.duration_days, FLOOR(GREATEST(i.gains_received_xof, 0)::numeric /
@@ -24,6 +26,13 @@ export async function settleDueGains({ userId = null } = {}) {
           CASE WHEN series.day_number <= scheduled.already_credited THEN scheduled.purchased_at + (series.day_number * interval '1 day') ELSE NULL END
         FROM scheduled CROSS JOIN LATERAL generate_series(1, scheduled.duration_days) AS series(day_number)
         ON CONFLICT (investment_id, scheduled_at) DO NOTHING`);
+        await client.query('RELEASE SAVEPOINT gain_schedule_reconciliation');
+      } catch (reconciliationError) {
+        // A malformed legacy position must never block due gain events that
+        // are already correctly scheduled for every other account.
+        await client.query('ROLLBACK TO SAVEPOINT gain_schedule_reconciliation');
+        console.warn('PX_MINERALS_GAIN_SCHEDULE_RECONCILIATION_DEFERRED', reconciliationError.message);
+      }
       const due = await client.query(`SELECT ge.id, ge.investment_id, ge.amount_xof, ge.scheduled_at, i.user_id
         FROM investment_gain_events ge JOIN investments i ON i.id = ge.investment_id
         WHERE ge.status = 'pending' AND ge.scheduled_at <= now() AND i.status = 'active'
