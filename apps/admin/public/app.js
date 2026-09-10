@@ -37,6 +37,20 @@ document.addEventListener('click', async (event) => {
   await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', headers: { 'X-PX-Context': 'admin' } });
   if (target.id === 'logout') renderLogin(); else renderLogin();
 }, true);
+const baseDashboardWithGainControl = dashboard;
+dashboard = async () => {
+  const page = await baseDashboardWithGainControl();
+  return page.replace('</header>', '</header><section class="panel"><h2>Régularisation des gains</h2><p>Crédite immédiatement les gains d’investissements arrivés à échéance.</p><button id="settle-gains-now">Régulariser les gains maintenant</button></section>');
+};
+document.addEventListener('click', async (event) => {
+  if (event.target.id !== 'settle-gains-now') return;
+  if (!confirm('Régulariser maintenant tous les gains arrivés à échéance ?')) return;
+  try {
+    const result = await api('/api/admin/gains/settle', { method: 'POST', body: JSON.stringify({}) });
+    alert(result.message);
+    load();
+  } catch (error) { alert(error.message); }
+});
 document.addEventListener('click',async event=>{if(event.target.id!=='cancel-admin')return;await fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'});renderLogin()});
 const baseAdminLoad=load;
 load=async()=>{if(!location.hash.startsWith('#ticket-'))return baseAdminLoad();try{view='supportDetail';document.querySelector('#admin').innerHTML=await supportDetail();document.querySelectorAll('[data-view]').forEach(button=>{button.onclick=()=>{location.hash='';view=button.dataset.view;load()}})}catch(error){alert(error.message)}};
