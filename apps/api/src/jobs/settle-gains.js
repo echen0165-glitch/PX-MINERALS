@@ -8,22 +8,21 @@ export async function settleDueGains({ userId = null } = {}) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      // Older investments may predate the daily-event schedule. Rebuild it
-      // lazily and idempotently so every active product is covered, even if
-      // the database migration has not run yet.
-      await client.query(`WITH legacy AS (
+      // Reconcile every active product against its full daily schedule. This
+      // restores a missing day even when an older deployment created only a
+      // partial schedule, and stays safe because each date is unique.
+      await client.query(`WITH scheduled AS (
           SELECT i.id, i.purchased_at, i.duration_days, i.daily_gain_xof,
             LEAST(i.duration_days, FLOOR(GREATEST(i.gains_received_xof, 0)::numeric /
               NULLIF(i.daily_gain_xof, 0))::int) AS already_credited
           FROM investments i
           WHERE i.status = 'active'
-            AND NOT EXISTS (SELECT 1 FROM investment_gain_events ge WHERE ge.investment_id = i.id)
         )
         INSERT INTO investment_gain_events (investment_id, scheduled_at, amount_xof, status, credited_at)
-        SELECT legacy.id, legacy.purchased_at + (series.day_number * interval '1 day'), legacy.daily_gain_xof,
-          CASE WHEN series.day_number <= legacy.already_credited THEN 'completed'::operation_status ELSE 'pending'::operation_status END,
-          CASE WHEN series.day_number <= legacy.already_credited THEN legacy.purchased_at + (series.day_number * interval '1 day') ELSE NULL END
-        FROM legacy CROSS JOIN LATERAL generate_series(1, legacy.duration_days) AS series(day_number)
+        SELECT scheduled.id, scheduled.purchased_at + (series.day_number * interval '1 day'), scheduled.daily_gain_xof,
+          CASE WHEN series.day_number <= scheduled.already_credited THEN 'completed'::operation_status ELSE 'pending'::operation_status END,
+          CASE WHEN series.day_number <= scheduled.already_credited THEN scheduled.purchased_at + (series.day_number * interval '1 day') ELSE NULL END
+        FROM scheduled CROSS JOIN LATERAL generate_series(1, scheduled.duration_days) AS series(day_number)
         ON CONFLICT (investment_id, scheduled_at) DO NOTHING`);
       const due = await client.query(`SELECT ge.id, ge.investment_id, ge.amount_xof, ge.scheduled_at, i.user_id
         FROM investment_gain_events ge JOIN investments i ON i.id = ge.investment_id
@@ -36,6 +35,7 @@ export async function settleDueGains({ userId = null } = {}) {
       await client.query(`UPDATE investment_gain_events SET status = 'completed', credited_at = now() WHERE id = $1`, [gain.id]);
       const remaining = await client.query(`SELECT count(*)::int AS count FROM investment_gain_events WHERE investment_id = $1 AND status = 'pending'`, [gain.investment_id]);
       await client.query(`UPDATE investments SET gains_received_xof = gains_received_xof + $1, next_gain_at = (SELECT min(scheduled_at) FROM investment_gain_events WHERE investment_id = $2 AND status = 'pending'), status = CASE WHEN $3 = 0 THEN 'completed' ELSE 'active' END WHERE id = $2`, [gain.amount_xof, gain.investment_id, remaining.rows[0].count]);
+      await client.query('UPDATE wallets SET total_gains_received = total_gains_received + $1, updated_at = now() WHERE user_id = $2', [gain.amount_xof, gain.user_id]);
       await client.query('COMMIT'); settled += 1;
     } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
   }
