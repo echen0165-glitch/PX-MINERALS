@@ -2,7 +2,7 @@ import { pool, closeDatabase } from '../config/database.js';
 import { applyWalletMutation } from '../modules/wallet/ledger.js';
 
 /** Credits each due gain once. Safe to run repeatedly or from multiple workers. */
-export async function settleDueGains({ userId = null } = {}) {
+export async function settleDueGains({ userId = null, reconcile = true } = {}) {
   let settled = 0;
   while (true) {
     const client = await pool.connect();
@@ -11,6 +11,7 @@ export async function settleDueGains({ userId = null } = {}) {
       // Reconcile every active product against its full daily schedule. This
       // restores a missing day even when an older deployment created only a
       // partial schedule, and stays safe because each date is unique.
+      if (reconcile) {
       await client.query('SAVEPOINT gain_schedule_reconciliation');
       try {
       await client.query(`WITH scheduled AS (
@@ -32,6 +33,7 @@ export async function settleDueGains({ userId = null } = {}) {
         // are already correctly scheduled for every other account.
         await client.query('ROLLBACK TO SAVEPOINT gain_schedule_reconciliation');
         console.warn('PX_MINERALS_GAIN_SCHEDULE_RECONCILIATION_DEFERRED', reconciliationError.message);
+      }
       }
       const due = await client.query(`SELECT ge.id, ge.investment_id, ge.amount_xof, ge.scheduled_at, i.user_id
         FROM investment_gain_events ge JOIN investments i ON i.id = ge.investment_id

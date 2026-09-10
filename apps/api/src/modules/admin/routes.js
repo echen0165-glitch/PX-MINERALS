@@ -65,7 +65,10 @@ adminRouter.get('/dashboard', async (request, response, next) => { try {
 } catch (error) { return next(error); } });
 adminRouter.post('/gains/settle', async (request, response, next) => {
   try {
-    const settled = await settleDueGains();
+    // Existing purchases already have their gain events. Process those first
+    // without any legacy reconstruction so a malformed old record cannot
+    // prevent current due gains from being credited.
+    const settled = await settleDueGains({ reconcile: false });
     return response.json({ settled, message: `${settled} gain(s) régularisé(s).` });
   } catch (error) { return next(error); }
 });
