@@ -32,7 +32,7 @@ ON CONFLICT (investment_id, scheduled_at) DO NOTHING;
 
 -- Keep the denormalized next-gain pointer consistent for backfilled rows.
 UPDATE investments i
-SET status = 'completed', next_gain_at = i.ends_at
+SET status = 'completed'::investment_status, next_gain_at = i.ends_at
 WHERE i.status = 'active'
   AND EXISTS (SELECT 1 FROM investment_gain_events ge WHERE ge.investment_id = i.id)
   AND NOT EXISTS (SELECT 1 FROM investment_gain_events ge WHERE ge.investment_id = i.id AND ge.status = 'pending');

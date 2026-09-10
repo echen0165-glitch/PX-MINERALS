@@ -49,7 +49,7 @@ export async function settleDueGains({ userId = null, reconcile = true } = {}) {
       // daily gain is paid; the column is NOT NULL in every deployed schema.
       await client.query(`UPDATE investments SET gains_received_xof = gains_received_xof + $1,
         next_gain_at = COALESCE((SELECT min(scheduled_at) FROM investment_gain_events WHERE investment_id = $2 AND status = 'pending'), ends_at),
-        status = CASE WHEN $3 = 0 THEN 'completed' ELSE 'active' END WHERE id = $2`, [gain.amount_xof, gain.investment_id, remaining.rows[0].count]);
+        status = CASE WHEN $3 = 0 THEN 'completed'::investment_status ELSE 'active'::investment_status END WHERE id = $2`, [gain.amount_xof, gain.investment_id, remaining.rows[0].count]);
       await client.query('UPDATE wallets SET total_gains_received = total_gains_received + $1, updated_at = now() WHERE user_id = $2', [gain.amount_xof, gain.user_id]);
       await client.query('COMMIT'); settled += 1;
     } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }

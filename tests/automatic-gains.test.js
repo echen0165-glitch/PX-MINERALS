@@ -15,4 +15,5 @@ test('gains job is a real Netlify scheduled function and dashboard has a safety 
   assert.match(job, /FROM scheduled CROSS JOIN LATERAL generate_series/);
   assert.match(job, /total_gains_received = total_gains_received \+ \$1/);
   assert.match(job, /COALESCE\(\(SELECT min\(scheduled_at\).*ends_at\)/s);
+  assert.match(job, /'completed'::investment_status ELSE 'active'::investment_status/);
 });
