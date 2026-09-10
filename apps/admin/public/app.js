@@ -40,7 +40,9 @@ document.addEventListener('click', async (event) => {
 const baseDashboardWithGainControl = dashboard;
 dashboard = async () => {
   const page = await baseDashboardWithGainControl();
-  return page.replace('</header>', '</header><section class="panel"><h2>Régularisation des gains</h2><p>Crédite immédiatement les gains d’investissements arrivés à échéance.</p><button id="settle-gains-now">Régulariser les gains maintenant</button></section>');
+  let state = 'Contrôle des échéances en cours…';
+  try { const report = await api('/api/admin/gains/status'); state = `${report.gains.due} gain(s) échus · ${fmt.format(report.gains.due_amount)} à créditer · ${report.gains.upcoming} à venir`; } catch { state = 'État indisponible : utilisez la régularisation pour relancer le traitement.'; }
+  return page.replace('</header>', `</header><section class="panel"><h2>Régularisation des gains</h2><p>${state}</p><button id="settle-gains-now">Régulariser les gains maintenant</button></section>`);
 };
 document.addEventListener('click', async (event) => {
   if (event.target.id !== 'settle-gains-now') return;

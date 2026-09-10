@@ -45,7 +45,11 @@ export async function settleDueGains({ userId = null, reconcile = true } = {}) {
       await applyWalletMutation(client, { userId: gain.user_id, type: 'gain', bucket: 'available', amountXof: Number(gain.amount_xof), reference: `GAIN-${gain.id}`, idempotencyKey: gain.id, reason: 'Gain d’investissement', metadata: { investmentId: gain.investment_id, gainEventId: gain.id } });
       await client.query(`UPDATE investment_gain_events SET status = 'completed', credited_at = now() WHERE id = $1`, [gain.id]);
       const remaining = await client.query(`SELECT count(*)::int AS count FROM investment_gain_events WHERE investment_id = $1 AND status = 'pending'`, [gain.investment_id]);
-      await client.query(`UPDATE investments SET gains_received_xof = gains_received_xof + $1, next_gain_at = (SELECT min(scheduled_at) FROM investment_gain_events WHERE investment_id = $2 AND status = 'pending'), status = CASE WHEN $3 = 0 THEN 'completed' ELSE 'active' END WHERE id = $2`, [gain.amount_xof, gain.investment_id, remaining.rows[0].count]);
+      // next_gain_at is intentionally retained at ends_at once the final
+      // daily gain is paid; the column is NOT NULL in every deployed schema.
+      await client.query(`UPDATE investments SET gains_received_xof = gains_received_xof + $1,
+        next_gain_at = COALESCE((SELECT min(scheduled_at) FROM investment_gain_events WHERE investment_id = $2 AND status = 'pending'), ends_at),
+        status = CASE WHEN $3 = 0 THEN 'completed' ELSE 'active' END WHERE id = $2`, [gain.amount_xof, gain.investment_id, remaining.rows[0].count]);
       await client.query('UPDATE wallets SET total_gains_received = total_gains_received + $1, updated_at = now() WHERE user_id = $2', [gain.amount_xof, gain.user_id]);
       await client.query('COMMIT'); settled += 1;
     } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }

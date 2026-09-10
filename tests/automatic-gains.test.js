@@ -14,4 +14,5 @@ test('gains job is a real Netlify scheduled function and dashboard has a safety 
   const job = await readFile(new URL('../apps/api/src/jobs/settle-gains.js', import.meta.url), 'utf8');
   assert.match(job, /FROM scheduled CROSS JOIN LATERAL generate_series/);
   assert.match(job, /total_gains_received = total_gains_received \+ \$1/);
+  assert.match(job, /COALESCE\(\(SELECT min\(scheduled_at\).*ends_at\)/s);
 });
